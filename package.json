@@ -1,0 +1,21 @@
+{
+  "name": "freeact",
+  "version": "1.0.0",
+  "description": "freeact is a mock of react. :D",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc && echo \"Build completed\"",
+    "start": "tsx src/index.ts"
+  },
+  "type": "module",
+  "keywords": [],
+  "author": "jdy8739",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.25.4",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
