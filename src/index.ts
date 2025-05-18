@@ -1,1 +1,1 @@
-console.log("Hello freeact");
+console.log('Hello freeact!!!');
