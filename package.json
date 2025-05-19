@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc && echo \"Build completed\"",
-    "start": "tsx src/index.ts"
+    "start": "nodemon --watch src --exec tsx src/index.ts"
   },
   "type": "module",
   "keywords": [],
@@ -17,6 +17,7 @@
     "esbuild": "^0.25.4",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.4.0",
+    "nodemon": "^3.1.10",
     "prettier": "^3.5.3",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
