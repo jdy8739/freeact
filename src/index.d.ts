@@ -1,13 +1,15 @@
-type FunctionComponent = (props: unknown) => VirtualNode | null;
+type Props = {
+  children: VirtualNode[];
+  [key: string]: unknown;
+};
 
-type VirtualElement = FunctionComponent | string | symbol;
+type FunctionComponent = (props: Props) => VirtualNode | null;
+
+type VirtualElement = FunctionComponent | string;
 
 type VirtualNode = {
   type: VirtualElement;
-  props: {
-    children: VirtualNode[];
-    [key: string]: unknown;
-  };
+  props: Props;
 };
 
 export type { VirtualNode, VirtualElement };
