@@ -7,7 +7,11 @@ freeact.render(
     'section',
     {},
     freeact.createVirtualElement('h1', { style: 'color: blue' }, 'Hello, World!'),
-    freeact.createVirtualElement('div', {}, freeact.createVirtualElement('h2', { style: 'color: red' }, 'Hi, World!')),
+    freeact.createVirtualElement(
+      'div',
+      null,
+      freeact.createVirtualElement('h2', { style: 'color: red' }, 'Hi, World!'),
+    ),
   ),
   app!,
 );

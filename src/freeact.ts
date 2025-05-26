@@ -20,7 +20,7 @@ class Freeact implements IFreeact {
 
   public createVirtualElement(
     type: VirtualElement,
-    props: { key?: Key } & Record<string, unknown>,
+    props: ({ key?: Key } & Record<string, unknown>) | null = {},
     ...children: unknown[]
   ): VirtualNode {
     const childrenElements = children
@@ -37,7 +37,7 @@ class Freeact implements IFreeact {
       type,
       props: {
         ...props,
-        key: props.key ?? null,
+        key: props?.key ?? null,
         children: childrenElements,
       },
     };
