@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-function-type */
 import { VirtualNode, VirtualElement, Key } from './index.d';
 
 const TEXT_ELEMENT = 'TEXT_ELEMENT';
@@ -8,6 +9,8 @@ interface IFreeact {
 }
 
 class Freeact implements IFreeact {
+  private virtualRootNode: VirtualNode | null = null;
+
   private createTextElement(text: string): VirtualNode {
     return {
       type: TEXT_ELEMENT,
@@ -65,6 +68,33 @@ class Freeact implements IFreeact {
     }
 
     return this.createHTMLElement(virtualNode);
+  }
+
+  private renderComponent(
+    parentNode: Node,
+    oldVirtualNode: VirtualNode | null,
+    newVirtualNode: VirtualNode | null,
+  ): void {
+    // Previously rendered virtual node by function component.
+    const oldRenderedVirtualNode = oldVirtualNode?.child ?? null;
+
+    let renderedVirtualNode: VirtualNode = (newVirtualNode?.type as Function)(newVirtualNode?.props);
+
+    if (!renderedVirtualNode) {
+      this.reconcile(parentNode, oldRenderedVirtualNode, null);
+      return;
+    }
+
+    if (typeof renderedVirtualNode !== 'object') {
+      renderedVirtualNode = this.createTextElement(String(renderedVirtualNode));
+    }
+
+    // Save child data for next reconcile.
+    newVirtualNode!.child = renderedVirtualNode as VirtualNode;
+
+    this.reconcile(parentNode, oldRenderedVirtualNode, renderedVirtualNode);
+
+    newVirtualNode!.realNode = renderedVirtualNode.realNode;
   }
 
   private reconcileOldAndNewChildrenByCompare(
@@ -125,6 +155,11 @@ class Freeact implements IFreeact {
 
     // Add real node in real dom tree when oldVirtualNode is null.
     if (!oldVirtualNode && newVirtualNode) {
+      if (typeof newVirtualNode.type === 'function') {
+        this.renderComponent(parantNode, null, newVirtualNode);
+        return;
+      }
+
       const newRealNode = this.createElement(newVirtualNode);
 
       newVirtualNode.realNode = newRealNode;
@@ -137,6 +172,12 @@ class Freeact implements IFreeact {
 
     // Replace real node in real dom tree when type is different.
     if (oldVirtualNode!.type !== newVirtualNode!.type) {
+      if (typeof newVirtualNode!.type === 'function') {
+        parantNode.removeChild(oldVirtualNode!.realNode!);
+        this.renderComponent(parantNode, null, newVirtualNode);
+        return;
+      }
+
       const newRealNode = this.createElement(newVirtualNode!);
 
       newVirtualNode!.realNode = newRealNode;
@@ -144,6 +185,12 @@ class Freeact implements IFreeact {
       parantNode.replaceChild(newRealNode, oldVirtualNode!.realNode!);
 
       this.reconcileChildren(newRealNode, [], newVirtualNode!.props.children);
+      return;
+    }
+
+    // Render component when type is function.
+    if (typeof newVirtualNode!.type === 'function') {
+      this.renderComponent(parantNode, oldVirtualNode, newVirtualNode);
       return;
     }
 
@@ -156,7 +203,11 @@ class Freeact implements IFreeact {
   }
 
   public render(virtualNode: VirtualNode, container: Element): void {
-    this.reconcile(container, null, virtualNode);
+    this.reconcile(container, this.virtualRootNode, virtualNode);
+
+    if (!this.virtualRootNode) {
+      this.virtualRootNode = virtualNode;
+    }
   }
 }
 
