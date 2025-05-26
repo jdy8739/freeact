@@ -1,17 +1,14 @@
-import { VirtualNode, VirtualElement } from './index.d';
+import { VirtualNode, VirtualElement, Key } from './index.d';
 
 const TEXT_ELEMENT = 'TEXT_ELEMENT';
 
 interface IFreeact {
-  createTextElement(text: string): VirtualNode;
   createVirtualElement(type: VirtualElement, props: Record<string, unknown>): VirtualNode;
   render(element: VirtualNode, container: Element): void;
 }
 
 class Freeact implements IFreeact {
-  private rootOfVirtualDomTree: VirtualNode | null = null;
-
-  public createTextElement(text: string): VirtualNode {
+  private createTextElement(text: string): VirtualNode {
     return {
       type: TEXT_ELEMENT,
       props: {
@@ -23,7 +20,7 @@ class Freeact implements IFreeact {
 
   public createVirtualElement(
     type: VirtualElement,
-    props: Record<string, unknown>,
+    props: { key?: Key } & Record<string, unknown>,
     ...children: unknown[]
   ): VirtualNode {
     const childrenElements = children
@@ -40,17 +37,69 @@ class Freeact implements IFreeact {
       type,
       props: {
         ...props,
+        key: props.key ?? null,
         children: childrenElements,
       },
     };
   }
 
-  private createElement(element: VirtualNode): Text | HTMLElement {
-    if (element.type === TEXT_ELEMENT) {
-      return document.createTextNode(String(element.props.value));
+  private createHTMLElement(virtualNode: VirtualNode): HTMLElement {
+    const realNode = document.createElement(virtualNode.type as string);
+
+    virtualNode.realNode = realNode;
+
+    for (const key in virtualNode.props) {
+      if (key === 'children' || key === 'key') {
+        continue;
+      }
+
+      realNode.setAttribute(key, String(virtualNode.props[key]));
     }
 
-    return document.createElement(element.type as string);
+    return realNode;
+  }
+
+  private createElement(virtualNode: VirtualNode): Text | HTMLElement {
+    if (virtualNode.type === TEXT_ELEMENT) {
+      return document.createTextNode(String(virtualNode.props.value));
+    }
+
+    return this.createHTMLElement(virtualNode);
+  }
+
+  private reconcileOldAndNewChildrenByCompare(
+    parantNode: Node,
+    oldVirtualChildren: VirtualNode[],
+    newVirtualChildren: VirtualNode[],
+  ): void {
+    /** Store old virtual children in map with their own key. */
+    const oldChildrenMap = new Map<string | number, VirtualNode>();
+
+    // Store old virtual children in map with their own key.
+    for (let i = 0; i < oldVirtualChildren.length; i++) {
+      const oldChild = oldVirtualChildren[i];
+
+      oldChildrenMap.set(oldChild.props.key ?? i, oldChild);
+    }
+
+    // Reconcile new virtual children with old virtual children.
+    for (let i = 0; i < newVirtualChildren.length; i++) {
+      const newChild = newVirtualChildren[i];
+
+      const newChildKey = newChild.props.key ?? i;
+
+      const oldChild = oldChildrenMap.get(newChildKey) ?? null;
+
+      this.reconcile(parantNode, oldChild, newChild);
+
+      // Remove old virtual child from map.
+      oldChildrenMap.delete(newChildKey);
+    }
+
+    // Remove remaining old virtual children from real dom tree.
+    for (const key of oldChildrenMap.keys()) {
+      this.reconcile(parantNode, oldChildrenMap.get(key)!, null);
+    }
   }
 
   private reconcileChildren(
@@ -58,11 +107,8 @@ class Freeact implements IFreeact {
     oldVirtualChildren: VirtualNode[],
     newVirtualChildren: VirtualNode[],
   ): void {
-    const maxLength = Math.max(oldVirtualChildren.length, newVirtualChildren.length);
-
-    for (let i = 0; i < maxLength; i++) {
-      this.reconcile(parantNode, oldVirtualChildren[i] ?? null, newVirtualChildren[i]);
-    }
+    this.reconcileOldAndNewChildrenByCompare(parantNode, oldVirtualChildren, newVirtualChildren);
+    //
   }
 
   // Run diffing algorithm to update real dom tree.
@@ -109,42 +155,8 @@ class Freeact implements IFreeact {
     }
   }
 
-  private initializeVirtualDomTree(virtualNode: VirtualNode, container: Element): void {
-    const node = this.createElement(virtualNode);
-
-    if (virtualNode.type === TEXT_ELEMENT) {
-      container.appendChild(node);
-      return;
-    }
-
-    const clonedProps = { ...virtualNode.props };
-
-    const isChildrenDeleted = Reflect.deleteProperty(clonedProps, 'children');
-
-    if (!isChildrenDeleted) {
-      throw new Error('Children delete failed');
-    }
-
-    for (const key in clonedProps) {
-      const element = node as HTMLElement;
-      element.setAttribute(key, String(clonedProps[key]));
-    }
-
-    for (const child of virtualNode.props.children) {
-      this.render(child, node as Element);
-    }
-
-    container.appendChild(node);
-  }
-
   public render(virtualNode: VirtualNode, container: Element): void {
-    if (!this.rootOfVirtualDomTree) {
-      this.initializeVirtualDomTree(virtualNode, container);
-      return;
-    }
-
-    this.reconcile(container, this.rootOfVirtualDomTree, virtualNode);
-    this.rootOfVirtualDomTree = virtualNode;
+    this.reconcile(container, null, virtualNode);
   }
 }
 

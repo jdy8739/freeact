@@ -1,4 +1,7 @@
+type Key = string | number | null;
+
 type Props = {
+  key?: Key;
   children: VirtualNode[];
   [key: string]: unknown;
 };
@@ -13,4 +16,4 @@ type VirtualNode = {
   realNode?: Node | null;
 };
 
-export type { VirtualNode, VirtualElement };
+export type { VirtualNode, VirtualElement, Key };
