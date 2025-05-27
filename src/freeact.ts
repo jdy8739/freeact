@@ -98,7 +98,7 @@ class Freeact implements IFreeact {
   }
 
   private reconcileOldAndNewChildrenByCompare(
-    parantNode: Node,
+    parentNode: Node,
     oldVirtualChildren: VirtualNode[],
     newVirtualChildren: VirtualNode[],
   ): void {
@@ -120,7 +120,7 @@ class Freeact implements IFreeact {
 
       const oldChild = oldChildrenMap.get(newChildKey) ?? null;
 
-      this.reconcile(parantNode, oldChild, newChild);
+      this.reconcile(parentNode, oldChild, newChild);
 
       // Remove old virtual child from map.
       oldChildrenMap.delete(newChildKey);
@@ -128,35 +128,35 @@ class Freeact implements IFreeact {
 
     // Remove remaining old virtual children from real dom tree.
     for (const key of oldChildrenMap.keys()) {
-      this.reconcile(parantNode, oldChildrenMap.get(key)!, null);
+      this.reconcile(parentNode, oldChildrenMap.get(key)!, null);
     }
   }
 
   private reconcileChildren(
-    parantNode: Node,
+    parentNode: Node,
     oldVirtualChildren: VirtualNode[],
     newVirtualChildren: VirtualNode[],
   ): void {
-    this.reconcileOldAndNewChildrenByCompare(parantNode, oldVirtualChildren, newVirtualChildren);
+    this.reconcileOldAndNewChildrenByCompare(parentNode, oldVirtualChildren, newVirtualChildren);
     //
   }
 
   // Run diffing algorithm to update real dom tree.
-  private reconcile(parantNode: Node, oldVirtualNode: VirtualNode | null, newVirtualNode: VirtualNode | null): void {
+  private reconcile(parentNode: Node, oldVirtualNode: VirtualNode | null, newVirtualNode: VirtualNode | null): void {
     if (!oldVirtualNode && !newVirtualNode) {
       return;
     }
 
     // Remove real node in real dom tree when newVirtualNode is null.
     if (oldVirtualNode && !newVirtualNode) {
-      parantNode.removeChild(oldVirtualNode.realNode!);
+      parentNode.removeChild(oldVirtualNode.realNode!);
       return;
     }
 
     // Add real node in real dom tree when oldVirtualNode is null.
     if (!oldVirtualNode && newVirtualNode) {
       if (typeof newVirtualNode.type === 'function') {
-        this.renderComponent(parantNode, null, newVirtualNode);
+        this.renderComponent(parentNode, null, newVirtualNode);
         return;
       }
 
@@ -164,7 +164,7 @@ class Freeact implements IFreeact {
 
       newVirtualNode.realNode = newRealNode;
 
-      parantNode.appendChild(newRealNode);
+      parentNode.appendChild(newRealNode);
 
       this.reconcileChildren(newRealNode, [], newVirtualNode!.props.children);
       return;
@@ -173,8 +173,8 @@ class Freeact implements IFreeact {
     // Replace real node in real dom tree when type is different.
     if (oldVirtualNode!.type !== newVirtualNode!.type) {
       if (typeof newVirtualNode!.type === 'function') {
-        parantNode.removeChild(oldVirtualNode!.realNode!);
-        this.renderComponent(parantNode, null, newVirtualNode);
+        parentNode.removeChild(oldVirtualNode!.realNode!);
+        this.renderComponent(parentNode, null, newVirtualNode);
         return;
       }
 
@@ -182,7 +182,7 @@ class Freeact implements IFreeact {
 
       newVirtualNode!.realNode = newRealNode;
 
-      parantNode.replaceChild(newRealNode, oldVirtualNode!.realNode!);
+      parentNode.replaceChild(newRealNode, oldVirtualNode!.realNode!);
 
       this.reconcileChildren(newRealNode, [], newVirtualNode!.props.children);
       return;
@@ -190,24 +190,22 @@ class Freeact implements IFreeact {
 
     // Render component when type is function.
     if (typeof newVirtualNode!.type === 'function') {
-      this.renderComponent(parantNode, oldVirtualNode, newVirtualNode);
+      this.renderComponent(parentNode, oldVirtualNode, newVirtualNode);
       return;
     }
 
     // Update real dom tree when old and new virtual nodes are same type.
     if (newVirtualNode!.type === TEXT_ELEMENT) {
-      parantNode.textContent = String(newVirtualNode!.props.value);
+      parentNode.textContent = String(newVirtualNode!.props.value);
     } else {
-      this.reconcileChildren(parantNode, oldVirtualNode!.props.children, newVirtualNode!.props.children);
+      this.reconcileChildren(parentNode, oldVirtualNode!.props.children, newVirtualNode!.props.children);
     }
   }
 
   public render(virtualNode: VirtualNode, container: Element): void {
     this.reconcile(container, this.virtualRootNode, virtualNode);
 
-    if (!this.virtualRootNode) {
-      this.virtualRootNode = virtualNode;
-    }
+    this.virtualRootNode = virtualNode;
   }
 }
 
