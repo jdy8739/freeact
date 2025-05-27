@@ -92,6 +92,8 @@ class Freeact implements IFreeact {
     // Save child data for next reconcile.
     newVirtualNode!.child = renderedVirtualNode as VirtualNode;
 
+    console.log(parentNode, oldRenderedVirtualNode, renderedVirtualNode);
+
     this.reconcile(parentNode, oldRenderedVirtualNode, renderedVirtualNode);
 
     newVirtualNode!.realNode = renderedVirtualNode.realNode;
@@ -119,6 +121,8 @@ class Freeact implements IFreeact {
       const newChildKey = newChild.props.key ?? i;
 
       const oldChild = oldChildrenMap.get(newChildKey) ?? null;
+
+      console.log(parentNode, oldChild, newChild);
 
       this.reconcile(parentNode, oldChild, newChild);
 
@@ -198,11 +202,13 @@ class Freeact implements IFreeact {
     if (newVirtualNode!.type === TEXT_ELEMENT) {
       parentNode.textContent = String(newVirtualNode!.props.value);
     } else {
+      console.log('!!@@', parentNode);
       this.reconcileChildren(parentNode, oldVirtualNode!.props.children, newVirtualNode!.props.children);
     }
   }
 
   public render(virtualNode: VirtualNode, container: Element): void {
+    console.log('container: ', container);
     this.reconcile(container, this.virtualRootNode, virtualNode);
 
     this.virtualRootNode = virtualNode;
