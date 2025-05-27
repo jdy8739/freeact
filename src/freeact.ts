@@ -98,7 +98,7 @@ class Freeact implements IFreeact {
   }
 
   private reconcileOldAndNewChildrenByCompare(
-    parentNode: Node,
+    nodeToBeUpdated: Node,
     oldVirtualChildren: VirtualNode[],
     newVirtualChildren: VirtualNode[],
   ): void {
@@ -120,7 +120,7 @@ class Freeact implements IFreeact {
 
       const oldChild = oldChildrenMap.get(newChildKey) ?? null;
 
-      this.reconcile(parentNode, oldChild, newChild);
+      this.reconcile(nodeToBeUpdated, oldChild, newChild);
 
       // Remove old virtual child from map.
       oldChildrenMap.delete(newChildKey);
@@ -128,16 +128,16 @@ class Freeact implements IFreeact {
 
     // Remove remaining old virtual children from real dom tree.
     for (const key of oldChildrenMap.keys()) {
-      this.reconcile(parentNode, oldChildrenMap.get(key)!, null);
+      this.reconcile(nodeToBeUpdated, oldChildrenMap.get(key)!, null);
     }
   }
 
   private reconcileChildren(
-    parentNode: Node,
+    nodeToBeUpdated: Node,
     oldVirtualChildren: VirtualNode[],
     newVirtualChildren: VirtualNode[],
   ): void {
-    this.reconcileOldAndNewChildrenByCompare(parentNode, oldVirtualChildren, newVirtualChildren);
+    this.reconcileOldAndNewChildrenByCompare(nodeToBeUpdated, oldVirtualChildren, newVirtualChildren);
     //
   }
 
@@ -194,11 +194,13 @@ class Freeact implements IFreeact {
       return;
     }
 
-    // Update real dom tree when old and new virtual nodes are same type.
+    /** Update real dom tree when old and new virtual nodes are same type. */
+    const nodeToBeUpdated: Node = (newVirtualNode!.realNode = oldVirtualNode!.realNode)!;
+
     if (newVirtualNode!.type === TEXT_ELEMENT) {
-      parentNode.textContent = String(newVirtualNode!.props.value);
+      nodeToBeUpdated!.textContent = String(newVirtualNode!.props.value);
     } else {
-      this.reconcileChildren(parentNode, oldVirtualNode!.props.children, newVirtualNode!.props.children);
+      this.reconcileChildren(nodeToBeUpdated!, oldVirtualNode!.props.children, newVirtualNode!.props.children);
     }
   }
 
