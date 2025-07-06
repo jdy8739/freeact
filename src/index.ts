@@ -2,28 +2,25 @@ import freeact from './freeact';
 
 const app = document.getElementById('app');
 
-// freeact.render(
-//   freeact.createVirtualElement(
-//     'section',
-//     {},
-//     freeact.createVirtualElement('h1', { style: 'color: blue' }, 'Hello, World!'),
-//     freeact.createVirtualElement(
-//       'div',
-//       null,
-//       freeact.createVirtualElement('h2', { style: 'color: red' }, 'Hi, World!'),
-//     ),
-//   ),
-//   app!,
-// );
+function Counter() {
+  const [count, setCount] = freeact.useState(0);
 
-function Hello(props: any) {
-  return freeact.createVirtualElement('h1', null, 'Hello ', props.name);
+  return freeact.createVirtualElement(
+    'div',
+    {
+      style: {
+        backgroundColor: 'blue',
+        padding: '10px',
+        borderRadius: '5px',
+        border: '1px solid black',
+        cursor: 'pointer',
+        fontSize: '16px',
+        fontWeight: 'bold',
+        color: 'white',
+      },
+    },
+    freeact.createVirtualElement('button', { onclick: () => setCount(count + 1) }, `Click me ${count}`),
+  );
 }
 
-const v1 = freeact.createVirtualElement(Hello, { name: 'React' });
-freeact.render(v1, app!);
-
-setTimeout(() => {
-  const v2 = freeact.createVirtualElement(Hello, { name: 'World' });
-  freeact.render(v2, app!);
-}, 1000);
+freeact.render(freeact.createVirtualElement(Counter), app!);
