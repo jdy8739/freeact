@@ -15,6 +15,9 @@ type VirtualNode = {
   props: Props;
   realNode?: Node | null;
   child?: VirtualNode | null;
+  hooks?: unknown[];
+  parentRealNode?: Node | null;
+  parentVirtualNode?: VirtualNode | null;
 };
 
 export type { VirtualNode, VirtualElement, Key };
