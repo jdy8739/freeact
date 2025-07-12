@@ -81,9 +81,8 @@ class Freeact implements IFreeact {
     return this.createHTMLElement(virtualNode);
   }
 
-  private renderComponent(
+  private renderFunctionComponent(
     parentNode: Node,
-    parentVirtualNode: VirtualNode | null,
     oldVirtualNode: VirtualNode | null,
     newVirtualNode: VirtualNode | null,
   ): void {
@@ -110,7 +109,7 @@ class Freeact implements IFreeact {
     this.currentRenderingComponent = null;
   }
 
-  private rerenderSubtree(virtualNode: VirtualNode) {
+  private renderSubtree(virtualNode: VirtualNode) {
     if (typeof virtualNode.type !== 'function') {
       return;
     }
@@ -137,6 +136,7 @@ class Freeact implements IFreeact {
     this.currentRenderingComponent = null;
   }
 
+  /** 가상 노드의 이전 자식요소와 새로운 자식요소를 비교하여 업데이트합니다. */
   private reconcileOldAndNewChildrenByCompare(
     nodeToBeUpdated: Node,
     parentVirtualNode: VirtualNode | null,
@@ -173,6 +173,7 @@ class Freeact implements IFreeact {
     }
   }
 
+  /** 가상노드의 이전 props와 새로운 props를 비교하여 업데이트하고 이전 자식요소와 새로운 자식요소를 비교하여 업데이트합니다. */
   private reconcileChildren(
     nodeToBeUpdated: Node,
     parentVirtualNode: VirtualNode | null,
@@ -188,7 +189,13 @@ class Freeact implements IFreeact {
     );
   }
 
-  // Run diffing algorithm to update real dom tree.
+  /**
+   * 가상노드의 이전 노드와 새로운 노드를 비교합니다.
+   * case 1: 새로운 노드가 없으면 이전 노드를 제거합니다.
+   * case 2: 이전 노드가 없으면 새로운 노드를 추가합니다.
+   * case 3: 이전 노드와 새로운 노드의 타입이 다르면 이전 노드를 제거하고 새로운 노드를 추가합니다.
+   * case 4: 이전 노드와 새로운 노드의 타입이 같으면 이전 노드를 업데이트합니다.
+   */
   private reconcile(
     parentNode: Node,
     parentVirtualNode: VirtualNode | null,
@@ -206,14 +213,16 @@ class Freeact implements IFreeact {
 
     // Remove real node in real dom tree when newVirtualNode is null.
     if (oldVirtualNode && !newVirtualNode) {
+      // case 1:
       parentNode.removeChild(oldVirtualNode.realNode!);
       return;
     }
 
     // Add real node in real dom tree when oldVirtualNode is null.
     if (!oldVirtualNode && newVirtualNode) {
+      // case 2:
       if (typeof newVirtualNode.type === 'function') {
-        this.renderComponent(parentNode, parentVirtualNode, null, newVirtualNode);
+        this.renderFunctionComponent(parentNode, null, newVirtualNode);
         return;
       }
 
@@ -221,7 +230,7 @@ class Freeact implements IFreeact {
 
       newVirtualNode.realNode = newRealNode;
 
-      parentNode.appendChild(newRealNode);
+      parentNode?.appendChild(newRealNode);
 
       this.reconcileChildren(newRealNode, parentVirtualNode, null, newVirtualNode!);
       return;
@@ -229,9 +238,10 @@ class Freeact implements IFreeact {
 
     // Replace real node in real dom tree when type is different.
     if (oldVirtualNode!.type !== newVirtualNode!.type) {
+      // case 3:
       if (typeof newVirtualNode!.type === 'function') {
         parentNode.removeChild(oldVirtualNode!.realNode!);
-        this.renderComponent(parentNode, parentVirtualNode, null, newVirtualNode);
+        this.renderFunctionComponent(parentNode, null, newVirtualNode);
         return;
       }
 
@@ -246,8 +256,9 @@ class Freeact implements IFreeact {
     }
 
     // Render component when type is function.
+    // case 4:
     if (typeof newVirtualNode!.type === 'function') {
-      this.renderComponent(parentNode, parentVirtualNode, oldVirtualNode, newVirtualNode);
+      this.renderFunctionComponent(parentNode, oldVirtualNode, newVirtualNode);
       return;
     }
 
@@ -291,7 +302,10 @@ class Freeact implements IFreeact {
     nextProps: Record<string, unknown>,
   ) {
     // Only proceed if dom is an Element (not a Text node)
-    if (!(element instanceof Element)) return;
+    if (!(element instanceof Element)) {
+      return;
+    }
+
     const el = element as HTMLElement;
 
     /**
@@ -307,15 +321,17 @@ class Freeact implements IFreeact {
     Object.keys(prevProps).forEach((key) => {
       if (key === 'children' || key === 'key') return; // 가상 DOM 전용 필드
 
-      const prevVal = prevProps[key];
-      const nextVal = nextProps[key];
+      const prevProp = prevProps[key];
+      const nextProp = nextProps[key];
 
-      if (!(key in nextProps) || prevVal !== nextVal) {
+      if (!(key in nextProps) || prevProp !== nextProp) {
         if (key.startsWith('on')) {
-          /* 이벤트:  remove → 캐시 정리 */
-          const type = key.slice(2).toLowerCase();
-          el.removeEventListener(type, prevVal as EventListener);
-          delete currentListeners[type];
+          /* 이전 렌더링 시점에 달려있었던 이벤트 */
+          const eventName = key.slice(2).toLowerCase();
+
+          el.removeEventListener(eventName, prevProp as EventListener);
+
+          Reflect.deleteProperty(currentListeners, eventName);
         } else if (key === 'style') {
           /* style: 전체 초기화(개별 diff는 2단계에서 처리) */
           el.style.cssText = '';
@@ -333,41 +349,36 @@ class Freeact implements IFreeact {
     Object.keys(nextProps).forEach((key) => {
       if (key === 'children' || key === 'key') return;
 
-      const prevPropValue = prevProps[key] as unknown as Record<string, unknown>;
-      const nextPropValue = nextProps[key] as unknown as Record<string, unknown>;
+      const prevProp = prevProps[key] as unknown as Record<string, unknown>;
+      const nextProp = nextProps[key] as unknown as Record<string, unknown>;
 
       // style 객체는 깊이 비교가 필요하므로 제외
-      if (
-        prevPropValue === nextPropValue &&
-        (typeof nextPropValue !== 'object' || nextPropValue === null) &&
-        key !== 'style'
-      )
-        return;
+      if (prevProp === nextProp && (typeof nextProp !== 'object' || nextProp === null) && key !== 'style') return;
 
       if (key.startsWith('on')) {
         /* 이벤트: 이전 리스너가 있으면 교체 */
         // 대문자 이벤트명 정규화: onClick -> click
         const eventName = key.slice(2).toLowerCase();
 
-        if (prevPropValue) {
-          el.removeEventListener(eventName, prevPropValue as unknown as EventListener);
+        if (prevProp) {
+          el.removeEventListener(eventName, prevProp as unknown as EventListener);
         }
 
-        if (nextPropValue && typeof nextPropValue === 'function') {
-          el.addEventListener(eventName, nextPropValue);
-          currentListeners[eventName] = nextPropValue;
+        if (nextProp && typeof nextProp === 'function') {
+          el.addEventListener(eventName, nextProp);
+          currentListeners[eventName] = nextProp;
         }
       } else if (key === 'style') {
-        this.applyStyle(el, prevPropValue ?? {}, nextPropValue ?? ({} as Record<string, unknown>));
+        this.applyStyle(el, prevProp ?? {}, nextProp ?? ({} as Record<string, unknown>));
       } else if (key === 'className') {
         // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-        nextPropValue ? el.setAttribute('class', String(nextPropValue)) : el.removeAttribute('class');
+        nextProp ? el.setAttribute('class', String(nextProp)) : el.removeAttribute('class');
       } else {
         /* 일반 속성: boolean true → 빈 문자열, false/null/undefined → 제거 */
-        if (nextPropValue === null || nextPropValue === undefined || (nextPropValue as unknown as boolean) === false) {
+        if (nextProp === null || nextProp === undefined || (nextProp as unknown as boolean) === false) {
           el.removeAttribute(key);
         } else {
-          el.setAttribute(key, typeof nextPropValue === 'boolean' ? '' : String(nextPropValue));
+          el.setAttribute(key, typeof nextProp === 'boolean' ? '' : String(nextProp));
         }
       }
     });
@@ -387,18 +398,20 @@ class Freeact implements IFreeact {
     const currentRenderingComponent = this.currentRenderingComponent;
 
     const state = hooks[this.hookIndex] as S;
-    const currentHookIndex = this.hookIndex;
+
+    /** 클로저 인덱스 */
+    const closureIndex = this.hookIndex;
 
     this.hookIndex++;
 
     const setState = (updatedState: S | ((prev: S) => S)) => {
       if (typeof updatedState === 'function') {
-        hooks[currentHookIndex] = (updatedState as (prev: S) => S)(hooks[currentHookIndex] as S);
+        hooks[closureIndex] = (updatedState as (prev: S) => S)(hooks[closureIndex] as S);
       } else {
-        hooks[currentHookIndex] = updatedState;
+        hooks[closureIndex] = updatedState;
       }
 
-      this.rerenderSubtree(currentRenderingComponent);
+      this.renderSubtree(currentRenderingComponent);
     };
 
     return [state, setState];
