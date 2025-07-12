@@ -406,13 +406,18 @@ class Freeact implements IFreeact {
       hooks.push(defaultValue);
     }
 
-    const currentRenderingComponent = this.currentRenderingComponent;
-
     /** 현재 이 컴포넌트의 hooks에서 지금 인덱스에 저장된 상태 */
     const state = hooks[this.hookIndex] as S;
 
     /** 클로저 인덱스 */
     const closureIndex = this.hookIndex;
+
+    /**
+     * 이 useState가 호출된 컴포넌트를 기억하는 클로저
+     * UI에서 useState를 호출하는 시점에는 this.currentRenderingComponent가 null이기 때문에
+     * 컴포넌트가 렌더링되는 시점의 컴포넌트를 클로저로 캡처
+     */
+    const closureRenderingComponent = this.currentRenderingComponent;
 
     this.hookIndex++;
 
@@ -423,7 +428,7 @@ class Freeact implements IFreeact {
         hooks[closureIndex] = updatedState;
       }
 
-      this.renderSubtree(currentRenderingComponent);
+      this.renderSubtree(closureRenderingComponent!);
     };
 
     return [state, setState];
