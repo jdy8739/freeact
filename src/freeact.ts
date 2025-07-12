@@ -81,6 +81,7 @@ class Freeact implements IFreeact {
     return this.createHTMLElement(virtualNode);
   }
 
+  /** 함수컴포넌트를 렌더링합니다. */
   private renderFunctionComponent(
     parentNode: Node,
     oldVirtualNode: VirtualNode | null,
@@ -90,25 +91,31 @@ class Freeact implements IFreeact {
     this.currentRenderingComponent = newVirtualNode;
     this.hookIndex = 0;
 
-    let nextVirtualNode = (newVirtualNode?.type as Function)(newVirtualNode?.props);
-    if (!nextVirtualNode) {
-      nextVirtualNode = this.createTextElement('');
-    } else if (typeof nextVirtualNode !== 'object') {
-      nextVirtualNode = this.createTextElement(String(nextVirtualNode));
+    /** 함수컴포넌트의 반환값 */
+    let childOfFunctionComponent = (newVirtualNode?.type as Function)(newVirtualNode?.props);
+
+    if (!childOfFunctionComponent) {
+      childOfFunctionComponent = this.createTextElement('');
+    } else if (typeof childOfFunctionComponent !== 'object') {
+      childOfFunctionComponent = this.createTextElement(String(childOfFunctionComponent));
     }
 
-    nextVirtualNode.parentNode = parentNode;
-    nextVirtualNode.parentVirtualNode = newVirtualNode;
+    childOfFunctionComponent.parentNode = parentNode;
+    childOfFunctionComponent.parentVirtualNode = newVirtualNode;
 
-    this.reconcile(parentNode, newVirtualNode, oldVirtualNode?.child || null, nextVirtualNode);
+    this.reconcile(parentNode, newVirtualNode, oldVirtualNode?.child || null, childOfFunctionComponent);
 
-    newVirtualNode!.child = nextVirtualNode;
-    newVirtualNode!.realNode = nextVirtualNode.realNode;
+    newVirtualNode!.child = childOfFunctionComponent;
+    newVirtualNode!.realNode = childOfFunctionComponent.realNode;
 
     /** Delete context for rendering component. */
     this.currentRenderingComponent = null;
   }
 
+  /**
+   * 자식 컴포넌트를 렌더링합니다.
+   * setState로 재렌더링되는 컴포넌트는 무조건 함수 컴포넌트이므로 함수취급합니다.
+   */
   private renderSubtree(virtualNode: VirtualNode) {
     if (typeof virtualNode.type !== 'function') {
       return;
@@ -117,21 +124,23 @@ class Freeact implements IFreeact {
     this.currentRenderingComponent = virtualNode;
     this.hookIndex = 0;
 
-    let nextVirtualNode = (virtualNode?.type as Function)(virtualNode?.props);
-    if (!nextVirtualNode) {
-      nextVirtualNode = this.createTextElement('');
-    } else if (typeof nextVirtualNode !== 'object') {
-      nextVirtualNode = this.createTextElement(String(nextVirtualNode));
+    /** 함수컴포넌트의 반환값 */
+    let childOfFunctionComponent = (virtualNode?.type as Function)(virtualNode?.props);
+
+    if (!childOfFunctionComponent) {
+      childOfFunctionComponent = this.createTextElement('');
+    } else if (typeof childOfFunctionComponent !== 'object') {
+      childOfFunctionComponent = this.createTextElement(String(childOfFunctionComponent));
     }
 
     const parentNode = virtualNode.parentRealNode;
-    nextVirtualNode.parentNode = parentNode;
-    nextVirtualNode.parentVirtualNode = virtualNode;
+    childOfFunctionComponent.parentNode = parentNode;
+    childOfFunctionComponent.parentVirtualNode = virtualNode;
 
-    this.reconcile(parentNode!, virtualNode, virtualNode.child ?? null, nextVirtualNode);
+    this.reconcile(parentNode!, virtualNode, virtualNode.child ?? null, childOfFunctionComponent);
 
-    virtualNode.child = nextVirtualNode;
-    virtualNode.realNode = nextVirtualNode.realNode;
+    virtualNode.child = childOfFunctionComponent;
+    virtualNode.realNode = childOfFunctionComponent.realNode;
 
     this.currentRenderingComponent = null;
   }
@@ -272,6 +281,7 @@ class Freeact implements IFreeact {
     }
   }
 
+  /**  */
   private applyStyle(el: HTMLElement, prevStyle: Record<string, unknown>, nextStyle: Record<string, unknown>) {
     if (typeof nextStyle !== 'object' || nextStyle === null) {
       el.style.cssText = (nextStyle || '') as string;
@@ -296,6 +306,7 @@ class Freeact implements IFreeact {
     }
   }
 
+  /** 가상노드의 이전 props를 제거하고 새로운 props를 적용합니다. */
   private updateVirtualNodeProps(
     element: Node,
     prevProps: Record<string, unknown>,
@@ -397,6 +408,7 @@ class Freeact implements IFreeact {
 
     const currentRenderingComponent = this.currentRenderingComponent;
 
+    /** 현재 이 컴포넌트의 hooks에서 지금 인덱스에 저장된 상태 */
     const state = hooks[this.hookIndex] as S;
 
     /** 클로저 인덱스 */
