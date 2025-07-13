@@ -193,8 +193,8 @@ class Freeact implements IFreeact {
     this.reconcileOldAndNewChildrenByCompare(
       nodeToBeUpdated,
       parentVirtualNode,
-      oldVirtual?.props.children ?? [],
-      newVirtual?.props.children ?? [],
+      oldVirtual?.props.children.flat() ?? [],
+      newVirtual?.props.children.flat() ?? [],
     );
   }
 

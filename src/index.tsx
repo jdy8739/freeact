@@ -26,10 +26,13 @@ function Counter() {
 
 const App = () => {
   return (
-    <div>
+    <section>
       <Text text="Hello Freeact" />
-      <Counter />
-    </div>
+
+      {[1, 2, 3].map((key) => (
+        <Counter key={key} />
+      ))}
+    </section>
   );
 };
 
