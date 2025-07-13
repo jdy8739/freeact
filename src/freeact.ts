@@ -11,7 +11,11 @@ interface IFreeact {
 class Freeact implements IFreeact {
   private virtualRootNode: VirtualNode | null = null;
 
-  /** currently rendering component */
+  /**
+   * currently rendering component
+   * !! 현재 렌더링되고 있는 가상돔 노드를 클로저로 캡처하여 setState 등의 함수 컨텍스트에 바인딩 및 그 클로저로부터 서브트리를 렌더링해야하기 때문에, 필요한 멤버  !!
+   * !! Members required because the currently rendered virtual dome node must be captured with a closure, bound to a function context such as setState, and a subtree must be rendered from the closure !!
+   */
   private currentRenderingComponent: VirtualNode | null = null;
 
   /** event listeners attached to each element */
@@ -193,7 +197,7 @@ class Freeact implements IFreeact {
     this.reconcileOldAndNewChildrenByCompare(
       nodeToBeUpdated,
       parentVirtualNode,
-      oldVirtual?.props.children.flat() ?? [],
+      oldVirtual?.props.children.flat() ?? [], // map 등의 메소드를 통해 배열로 들어오는 jsx 요소 평탄화
       newVirtual?.props.children.flat() ?? [],
     );
   }
