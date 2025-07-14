@@ -9,8 +9,6 @@ interface IFreeact {
 }
 
 class Freeact implements IFreeact {
-  private virtualRootNode: VirtualNode | null = null;
-
   /**
    * currently rendering component
    * !! 현재 렌더링되고 있는 가상돔 노드를 클로저로 캡처하여 setState 등의 함수 컨텍스트에 바인딩 및 그 클로저로부터 서브트리를 렌더링해야하기 때문에, 필요한 멤버  !!
@@ -23,9 +21,6 @@ class Freeact implements IFreeact {
 
   /** hook index */
   private hookIndex = 0;
-
-  /** root node */
-  private rootNode: Element | null = null;
 
   /**
    * pending effects
@@ -153,6 +148,8 @@ class Freeact implements IFreeact {
     virtualNode.realNode = childOfFunctionComponent.realNode;
 
     this.currentRenderingComponent = null;
+
+    this.flushEffects();
   }
 
   /** 가상 노드의 이전 자식요소와 새로운 자식요소를 비교하여 업데이트합니다. */
@@ -233,6 +230,7 @@ class Freeact implements IFreeact {
     // Remove real node in real dom tree when newVirtualNode is null.
     if (oldVirtualNode && !newVirtualNode) {
       // case 1:
+
       parentNode.removeChild(oldVirtualNode.realNode!);
       return;
     }
@@ -454,6 +452,14 @@ class Freeact implements IFreeact {
     });
   }
 
+  private flushEffects() {
+    while (this.pendingEffects.length > 0) {
+      this.pendingEffects.shift()?.();
+    }
+
+    this.pendingEffects = [];
+  }
+
   public useEffect(callback: EffectCallback, deps: unknown[]) {
     if (!this.currentRenderingComponent) {
       throw new Error('useEffect can only be called inside a function component.');
@@ -508,12 +514,9 @@ class Freeact implements IFreeact {
   }
 
   public render(virtualNode: VirtualNode, container: Element): void {
-    if (!this.rootNode) {
-      this.rootNode = container;
-    }
+    this.reconcile(container, null, null, virtualNode);
 
-    this.reconcile(container, null, this.virtualRootNode, virtualNode);
-    this.virtualRootNode = virtualNode;
+    this.flushEffects();
   }
 }
 
