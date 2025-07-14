@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
-import { VirtualNode, VirtualElement, Key } from './index.d';
+import { VirtualNode, VirtualElement, Key, Effect, EffectCallback } from './index.d';
 
 const TEXT_ELEMENT = 'TEXT_ELEMENT';
 
@@ -26,6 +26,12 @@ class Freeact implements IFreeact {
 
   /** root node */
   private rootNode: Element | null = null;
+
+  /**
+   * pending effects
+   * 렌더링 중에 포착된, 렌더링 이후에 실행되어야 하는 이펙트들을 저장하는 배열
+   */
+  private pendingEffects: (() => void)[] = [];
 
   /** create text element */
   private createTextElement(text: string): VirtualNode {
@@ -436,6 +442,69 @@ class Freeact implements IFreeact {
     };
 
     return [state, setState];
+  }
+
+  private scheduleEffect(effect: Effect) {
+    this.pendingEffects.push(() => {
+      effect.cleanup?.();
+
+      const nextCleanup = effect.callback();
+
+      effect['cleanup'] = typeof nextCleanup === 'function' ? nextCleanup : undefined;
+    });
+  }
+
+  public useEffect(callback: EffectCallback, deps: unknown[]) {
+    if (!this.currentRenderingComponent) {
+      throw new Error('useEffect can only be called inside a function component.');
+    }
+
+    const hooks = (this.currentRenderingComponent.hooks ||= []);
+
+    // 앱이 처음 렌더링되어 가상노드의 훅에 저장될 때
+    if (hooks.length <= this.hookIndex) {
+      const effect: Effect = { callback, deps, cleanup: undefined };
+
+      hooks.push(effect);
+      this.scheduleEffect(effect);
+
+      this.hookIndex++;
+      return;
+    }
+
+    // 초기 렌더가 아니어서, 이미 훅에 저장되어 있는 훅이 있을 때
+
+    /** 의존성 배열이 변경되었는지 여부 */
+    let isDepsChanged = false;
+
+    /** 현재 훅 인덱스에 저장된 이펙트 정보 */
+    const currentIndexEffect = hooks[this.hookIndex] as Effect;
+
+    /** 이전 의존성 배열 */
+    const prevDeps = currentIndexEffect['deps'];
+
+    /** 이전 의존성 배열이 없거나 새로운 의존성 배열이 없거나 길이가 다르면 의존성 배열이 변경되었다고 판단 */
+    if (!prevDeps || !deps || prevDeps.length !== deps.length) {
+      isDepsChanged = true;
+    } else {
+      for (let i = 0; i < prevDeps.length; i++) {
+        if (!Object.is(prevDeps[i], deps[i])) {
+          isDepsChanged = true;
+          break;
+        }
+      }
+    }
+
+    if (isDepsChanged) {
+      // 의존성 배열이 변경되었으므로 이펙트 정보를 업데이트
+      currentIndexEffect['callback'] = callback;
+      currentIndexEffect['deps'] = deps;
+
+      // 이펙트를 다시 스케줄링
+      this.scheduleEffect(currentIndexEffect);
+    }
+
+    this.hookIndex++;
   }
 
   public render(virtualNode: VirtualNode, container: Element): void {
