@@ -230,6 +230,12 @@ class Freeact implements IFreeact {
     // Remove real node in real dom tree when newVirtualNode is null.
     if (oldVirtualNode && !newVirtualNode) {
       // case 1:
+      // remove effects before unmounting
+      if (oldVirtualNode.hooks) {
+        for (const effect of oldVirtualNode.hooks) {
+          (effect as Effect).cleanup?.();
+        }
+      }
 
       parentNode.removeChild(oldVirtualNode.realNode!);
       return;
