@@ -20,4 +20,23 @@ type VirtualNode = {
   parentVirtualNode?: VirtualNode | null;
 };
 
-export type { VirtualNode, VirtualElement, Key };
+/**
+ * @type {EffectCallback}
+ * callback of useEffect hook
+ */
+type EffectCallback = () => () => void | undefined;
+
+/**
+ * @type {Effect}
+ * parameters of useEffect hook and cleanup function
+ * callback - callback of useEffect hook
+ * cleanup - cleanup function of useEffect hook
+ * deps - dependencies of useEffect hook
+ */
+type Effect = {
+  callback: EffectCallback;
+  cleanup?: () => void;
+  deps: unknown[];
+};
+
+export type { VirtualNode, VirtualElement, Key, EffectCallback, Effect };
