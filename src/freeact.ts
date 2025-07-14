@@ -232,8 +232,10 @@ class Freeact implements IFreeact {
       // case 1:
       // remove effects before unmounting
       if (oldVirtualNode.hooks) {
-        for (const effect of oldVirtualNode.hooks) {
-          (effect as Effect).cleanup?.();
+        for (const hook of oldVirtualNode.hooks) {
+          if (Boolean(hook) && typeof hook === 'object') {
+            (hook as Effect).cleanup?.();
+          }
         }
       }
 
