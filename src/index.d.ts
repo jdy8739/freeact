@@ -24,7 +24,7 @@ type VirtualNode = {
  * @type {EffectCallback}
  * callback of useEffect hook
  */
-type EffectCallback = () => () => void | undefined;
+type EffectCallback = () => void | (() => void);
 
 /**
  * @type {Effect}
