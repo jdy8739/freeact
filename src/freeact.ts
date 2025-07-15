@@ -26,7 +26,7 @@ class Freeact implements IFreeact {
    * pending effects
    * 렌더링 중에 포착된, 렌더링 이후에 실행되어야 하는 이펙트들을 저장하는 배열
    */
-  private pendingEffects: (() => void)[] = [];
+  private pendingEffectsQueue: (() => void)[] = [];
 
   /** create text element */
   private createTextElement(text: string): VirtualNode {
@@ -462,7 +462,7 @@ class Freeact implements IFreeact {
 
   /** 이펙트가 트리거되면 렌더링이 끝난 이후에 실행되도록 스케줄링합니다. */
   private scheduleEffect(effect: Effect) {
-    this.pendingEffects.push(() => {
+    this.pendingEffectsQueue.push(() => {
       effect.cleanup?.();
 
       const nextCleanup = effect.callback();
@@ -473,11 +473,11 @@ class Freeact implements IFreeact {
 
   /** 렌더링이 끝난 이후에 실행되도록 스케줄링된 이펙트들을 한꺼번에 실행합니다. (flush - 비우다)*/
   private flushEffects() {
-    while (this.pendingEffects.length > 0) {
-      this.pendingEffects.shift()?.();
+    while (this.pendingEffectsQueue.length > 0) {
+      this.pendingEffectsQueue.shift()?.();
     }
 
-    this.pendingEffects = [];
+    this.pendingEffectsQueue = [];
   }
 
   public useEffect(callback: EffectCallback, deps: unknown[]) {
