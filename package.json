@@ -4,10 +4,11 @@
   "description": "freeact is a mock of react. :D",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild src/index.tsx --bundle --format=esm --outfile=dist/bundle.js"
+    "build": "esbuild src/index.tsx --bundle --format=esm --outfile=dist/bundle.js",
+    "start": "serve ."
   },
   "type": "module",
-  "keywords": [],
+  "keywords": ["react", "freeact", "mock", "react-like", "virtual-dom"],
   "author": "jdy8739",
   "license": "ISC",
   "devDependencies": {
@@ -16,6 +17,7 @@
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.4.0",
     "prettier": "^3.5.3",
+    "serve": "^14.2.4",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.32.1"
