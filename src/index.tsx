@@ -88,6 +88,11 @@ const TodoList = () => {
 
   const [filter, setFilter] = freeact.useState<'all' | 'active' | 'completed'>('all');
 
+  const resetInputValue = () => {
+    const input = document.querySelector('input') as HTMLInputElement;
+    input.value = '';
+  };
+
   const addTodo = () => {
     if (inputValue.trim()) {
       const newTodo: Todo = {
@@ -95,8 +100,11 @@ const TodoList = () => {
         text: inputValue.trim(),
         completed: false,
       };
+
       setTodos((prev) => [...prev, newTodo]);
       setInputValue('');
+
+      resetInputValue();
     }
   };
 
@@ -177,7 +185,6 @@ const TodoList = () => {
         >
           <input
             type="text"
-            value={inputValue}
             onChange={(e: any) => setInputValue(e.target.value)}
             onKeyPress={(e: any) => e.key === 'Enter' && addTodo()}
             placeholder="Add a new todo..."
