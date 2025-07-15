@@ -230,6 +230,8 @@ class Freeact implements IFreeact {
     // Remove real node in real dom tree when newVirtualNode is null.
     if (oldVirtualNode && !newVirtualNode) {
       // case 1:
+      parentNode.removeChild(oldVirtualNode.realNode!);
+
       // remove effects before unmounting
       if (oldVirtualNode.hooks) {
         for (const hook of oldVirtualNode.hooks) {
@@ -238,8 +240,6 @@ class Freeact implements IFreeact {
           }
         }
       }
-
-      parentNode.removeChild(oldVirtualNode.realNode!);
       return;
     }
 
@@ -297,7 +297,7 @@ class Freeact implements IFreeact {
     }
   }
 
-  /**  */
+  /** 진짜 노드에 스타일을 적용합니다. */
   private applyStyle(el: HTMLElement, prevStyle: Record<string, unknown>, nextStyle: Record<string, unknown>) {
     if (typeof nextStyle !== 'object' || nextStyle === null) {
       el.style.cssText = (nextStyle || '') as string;
@@ -320,6 +320,17 @@ class Freeact implements IFreeact {
         styleDecl[key] = updatedStyleValue;
       }
     }
+  }
+
+  /** 이벤트 이름을 정규화합니다. */
+  private convertToEventName(arg: string): string {
+    // 대문자 이벤트명 정규화: onClick -> click
+    const eventName = arg.slice(2).toLowerCase();
+
+    /** change 이벤트는 input 이벤트로 변환 */
+    const convertedEventName = eventName === 'change' ? 'input' : eventName;
+
+    return convertedEventName;
   }
 
   /** 가상노드의 이전 props를 제거하고 새로운 props를 적용합니다. */
@@ -354,7 +365,7 @@ class Freeact implements IFreeact {
       if (!(key in nextProps) || prevProp !== nextProp) {
         if (key.startsWith('on')) {
           /* 이전 렌더링 시점에 달려있었던 이벤트 */
-          const eventName = key.slice(2).toLowerCase();
+          const eventName = this.convertToEventName(key);
 
           el.removeEventListener(eventName, prevProp as EventListener);
 
@@ -384,8 +395,7 @@ class Freeact implements IFreeact {
 
       if (key.startsWith('on')) {
         /* 이벤트: 이전 리스너가 있으면 교체 */
-        // 대문자 이벤트명 정규화: onClick -> click
-        const eventName = key.slice(2).toLowerCase();
+        const eventName = this.convertToEventName(key);
 
         if (prevProp) {
           el.removeEventListener(eventName, prevProp as unknown as EventListener);
@@ -450,6 +460,7 @@ class Freeact implements IFreeact {
     return [state, setState];
   }
 
+  /** 이펙트가 트리거되면 렌더링이 끝난 이후에 실행되도록 스케줄링합니다. */
   private scheduleEffect(effect: Effect) {
     this.pendingEffects.push(() => {
       effect.cleanup?.();
@@ -460,6 +471,7 @@ class Freeact implements IFreeact {
     });
   }
 
+  /** 렌더링이 끝난 이후에 실행되도록 스케줄링된 이펙트들을 한꺼번에 실행합니다. (flush - 비우다)*/
   private flushEffects() {
     while (this.pendingEffects.length > 0) {
       this.pendingEffects.shift()?.();
