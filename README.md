@@ -2,7 +2,7 @@
 
 React 16 버전을 기반으로 한 DFS(Depth-First Search) 방식의 가상 DOM 구현체입니다. Fiber 아키텍처 없이 기본적인 React 기능들을 구현하여 상태 관리와 컴포넌트 렌더링의 핵심 개념을 이해할 수 있도록 설계되었습니다.
 
-블로그를 방문하려면 우클릭 후 "새 탭에서 열기"를 선택하세요.
+Freeact로 만든 데모 앱을 방문하려면 우클릭 후 "새 탭에서 열기"를 선택하세요.
 <a href="https://freeact.netlify.app/" target="_blank">Freeact로 구현한 TODO 앱</a>
 
 ## 프로젝트 개요
