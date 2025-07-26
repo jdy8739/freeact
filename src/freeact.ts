@@ -10,25 +10,36 @@ interface IFreeact {
 
 class Freeact implements IFreeact {
   /**
-   * currently rendering component
+   * @private
+   * @member currently rendering component
    * !! 현재 렌더링되고 있는 가상돔 노드를 클로저로 캡처하여 setState 등의 함수 컨텍스트에 바인딩 및 그 클로저로부터 서브트리를 렌더링해야하기 때문에, 필요한 멤버  !!
    * !! Members required because the currently rendered virtual dome node must be captured with a closure, bound to a function context such as setState, and a subtree must be rendered from the closure !!
    */
   private currentRenderingComponent: VirtualNode | null = null;
 
-  /** event listeners attached to each element */
+  /**
+   * @private
+   * @member event listeners attached to each element
+   */
   private eventListeners = new WeakMap<HTMLElement, Record<string, EventListener>>();
 
-  /** hook index */
+  /**
+   * @private
+   * @member hook index
+   */
   private hookIndex = 0;
 
   /**
-   * pending effects
+   * @private
+   * @member pending effects
    * 렌더링 중에 포착된, 렌더링 이후에 실행되어야 하는 이펙트들을 저장하는 배열
    */
   private pendingEffectsQueue: (() => void)[] = [];
 
-  /** create text element */
+  /**
+   * @private
+   * @description create text element
+   */
   private createTextElement(text: string): VirtualNode {
     return {
       type: TEXT_ELEMENT,
@@ -39,6 +50,9 @@ class Freeact implements IFreeact {
     };
   }
 
+  /**
+   * @description create virtual element
+   */
   public createVirtualElement(
     type: VirtualElement,
     props: ({ key?: Key } & Record<string, unknown>) | null = {},
@@ -62,6 +76,10 @@ class Freeact implements IFreeact {
     };
   }
 
+  /**
+   * @private
+   * @description create real dom element
+   */
   private createHTMLElement(virtualNode: VirtualNode): HTMLElement {
     const realNode = document.createElement(virtualNode.type as string);
 
@@ -78,6 +96,10 @@ class Freeact implements IFreeact {
     return realNode;
   }
 
+  /**
+   * @private
+   * @description create real dom element or text node
+   */
   private createElement(virtualNode: VirtualNode): Text | HTMLElement {
     if (virtualNode.type === TEXT_ELEMENT) {
       return document.createTextNode(String(virtualNode.props.value));
@@ -86,7 +108,10 @@ class Freeact implements IFreeact {
     return this.createHTMLElement(virtualNode);
   }
 
-  /** 함수컴포넌트를 렌더링합니다. */
+  /**
+   * @private
+   * @description render function component
+   */
   private renderFunctionComponent(
     parentNode: Node,
     oldVirtualNode: VirtualNode | null,
@@ -118,7 +143,8 @@ class Freeact implements IFreeact {
   }
 
   /**
-   * 자식 컴포넌트를 렌더링합니다.
+   * @private
+   * @description render subtree
    * setState로 재렌더링되는 컴포넌트는 무조건 함수 컴포넌트이므로 함수취급합니다.
    */
   private renderSubtree(virtualNode: VirtualNode) {
@@ -152,7 +178,10 @@ class Freeact implements IFreeact {
     this.flushEffects();
   }
 
-  /** 가상 노드의 이전 자식요소와 새로운 자식요소를 비교하여 업데이트합니다. */
+  /**
+   * @private
+   * @description reconcile old and new children by compare
+   */
   private reconcileOldAndNewChildrenByCompare(
     nodeToBeUpdated: Node,
     parentVirtualNode: VirtualNode | null,
@@ -177,7 +206,12 @@ class Freeact implements IFreeact {
 
       const oldChild = oldChildrenMap.get(newChildKey) ?? null;
 
-      this.reconcile(nodeToBeUpdated, parentVirtualNode, oldChild, newChild);
+      /**
+       * @description 업데이트 되는 가상돔 트리에서 현재 트리의 다음 형제 노드
+       */
+      const nextSibling = newVirtualChildren[i + 1]?.realNode ?? null;
+
+      this.reconcile(nodeToBeUpdated, parentVirtualNode, oldChild, newChild, nextSibling);
 
       // Remove old virtual child from map.
       oldChildrenMap.delete(newChildKey);
@@ -189,7 +223,10 @@ class Freeact implements IFreeact {
     }
   }
 
-  /** 가상노드의 이전 props와 새로운 props를 비교하여 업데이트하고 이전 자식요소와 새로운 자식요소를 비교하여 업데이트합니다. */
+  /**
+   * @private
+   * @description update virtual node props and reconcile old and new children by compare
+   */
   private reconcileChildren(
     nodeToBeUpdated: Node,
     parentVirtualNode: VirtualNode | null,
@@ -206,7 +243,19 @@ class Freeact implements IFreeact {
   }
 
   /**
-   * 가상노드의 이전 노드와 새로운 노드를 비교합니다.
+   * @private
+   * @description update node order in reconciliation process
+   */
+  private updateNodeOrder(parentNode: Node, realNode: Node, nextSibling: Node | null | undefined) {
+    if (nextSibling) {
+      parentNode.insertBefore(realNode, nextSibling);
+    } else {
+      parentNode.appendChild(realNode);
+    }
+  }
+
+  /**
+   * @description 가상노드의 이전 노드와 새로운 노드를 비교합니다.
    * case 1: 새로운 노드가 없으면 이전 노드를 제거합니다.
    * case 2: 이전 노드가 없으면 새로운 노드를 추가합니다.
    * case 3: 이전 노드와 새로운 노드의 타입이 다르면 이전 노드를 제거하고 새로운 노드를 추가합니다.
@@ -217,6 +266,7 @@ class Freeact implements IFreeact {
     parentVirtualNode: VirtualNode | null,
     oldVirtualNode: VirtualNode | null,
     newVirtualNode: VirtualNode | null,
+    nextSibling?: Node | null,
   ): void {
     if (newVirtualNode) {
       newVirtualNode.parentRealNode = parentNode;
@@ -227,9 +277,10 @@ class Freeact implements IFreeact {
       return;
     }
 
-    // Remove real node in real dom tree when newVirtualNode is null.
+    /**
+     * @case 1: Remove real node in real dom tree when newVirtualNode is null.
+     */
     if (oldVirtualNode && !newVirtualNode) {
-      // case 1:
       parentNode.removeChild(oldVirtualNode.realNode!);
 
       // remove effects before unmounting
@@ -243,9 +294,10 @@ class Freeact implements IFreeact {
       return;
     }
 
-    // Add real node in real dom tree when oldVirtualNode is null.
+    /**
+     * @case 2: Add real node in real dom tree when oldVirtualNode is null.
+     */
     if (!oldVirtualNode && newVirtualNode) {
-      // case 2:
       if (typeof newVirtualNode.type === 'function') {
         this.renderFunctionComponent(parentNode, null, newVirtualNode);
         return;
@@ -255,49 +307,62 @@ class Freeact implements IFreeact {
 
       newVirtualNode.realNode = newRealNode;
 
-      parentNode?.appendChild(newRealNode);
+      // 재조정 과정에서 nextSibling이 있으면 그 위치에 추가하고, 없으면 맨 뒤에 추가
+      this.updateNodeOrder(parentNode, newRealNode, nextSibling);
 
       this.reconcileChildren(newRealNode, parentVirtualNode, null, newVirtualNode!);
       return;
     }
 
-    // Replace real node in real dom tree when type is different.
+    /**
+     * @case 3: Replace real node in real dom tree when type is different.
+     */
     if (oldVirtualNode!.type !== newVirtualNode!.type) {
-      // case 3:
       if (typeof newVirtualNode!.type === 'function') {
         parentNode.removeChild(oldVirtualNode!.realNode!);
         this.renderFunctionComponent(parentNode, null, newVirtualNode);
         return;
       }
 
-      const newRealNode = this.createElement(newVirtualNode!);
+      /**
+       * @description change position of the newRealNode if the order has changed by insertBefore or appendChild
+       */
+      const newRealNode = parentNode.replaceChild(this.createElement(newVirtualNode!), oldVirtualNode!.realNode!);
 
       newVirtualNode!.realNode = newRealNode;
 
-      parentNode.replaceChild(newRealNode, oldVirtualNode!.realNode!);
+      this.updateNodeOrder(parentNode, newRealNode, nextSibling);
 
       this.reconcileChildren(newRealNode, parentVirtualNode, null, newVirtualNode!);
       return;
     }
 
-    // Render component when type is function.
-    // case 4:
+    /**
+     * @case 4: the case that old and new virtual nodes are same type and type is function.
+     */
     if (typeof newVirtualNode!.type === 'function') {
       this.renderFunctionComponent(parentNode, oldVirtualNode, newVirtualNode);
       return;
     }
 
-    /** Update real dom tree when old and new virtual nodes are same type. */
-    const nodeToBeUpdated: Node = (newVirtualNode!.realNode = oldVirtualNode!.realNode)!;
+    /**
+     * @description Update real dom tree when old and new virtual nodes are same type and type is not function.
+     */
+    const realNode: Node = (newVirtualNode!.realNode = oldVirtualNode!.realNode)!;
+
+    this.updateNodeOrder(parentNode, realNode, nextSibling);
 
     if (newVirtualNode!.type === TEXT_ELEMENT) {
-      nodeToBeUpdated!.textContent = String(newVirtualNode!.props.value);
+      realNode!.textContent = String(newVirtualNode!.props.value);
     } else {
-      this.reconcileChildren(nodeToBeUpdated!, parentVirtualNode, oldVirtualNode!, newVirtualNode!);
+      this.reconcileChildren(realNode!, parentVirtualNode, oldVirtualNode!, newVirtualNode!);
     }
   }
 
-  /** 진짜 노드에 스타일을 적용합니다. */
+  /**
+   * @private
+   * @description apply style to real dom element
+   */
   private applyStyle(el: HTMLElement, prevStyle: Record<string, unknown>, nextStyle: Record<string, unknown>) {
     if (typeof nextStyle !== 'object' || nextStyle === null) {
       el.style.cssText = (nextStyle || '') as string;
@@ -322,7 +387,10 @@ class Freeact implements IFreeact {
     }
   }
 
-  /** 이벤트 이름을 정규화합니다. */
+  /**
+   * @private
+   * @description convert event name to normalized event name
+   */
   private convertToEventName(arg: string): string {
     // 대문자 이벤트명 정규화: onClick -> click
     const eventName = arg.slice(2).toLowerCase();
@@ -333,7 +401,10 @@ class Freeact implements IFreeact {
     return convertedEventName;
   }
 
-  /** 가상노드의 이전 props를 제거하고 새로운 props를 적용합니다. */
+  /**
+   * @private
+   * @description update virtual node props
+   */
   private updateVirtualNodeProps(
     element: Node,
     prevProps: Record<string, unknown>,
@@ -421,6 +492,9 @@ class Freeact implements IFreeact {
     });
   }
 
+  /**
+   * @description useState
+   */
   public useState<S>(defaultValue: S): [S, (value: S | ((prev: S) => S)) => void] {
     if (!this.currentRenderingComponent) {
       throw new Error('useState can only be called inside a function component.');
@@ -460,7 +534,10 @@ class Freeact implements IFreeact {
     return [state, setState];
   }
 
-  /** 이펙트가 트리거되면 렌더링이 끝난 이후에 실행되도록 스케줄링합니다. */
+  /**
+   * @private
+   * @description schedule effect
+   */
   private scheduleEffect(effect: Effect) {
     this.pendingEffectsQueue.push(() => {
       effect.cleanup?.();
@@ -471,7 +548,11 @@ class Freeact implements IFreeact {
     });
   }
 
-  /** 렌더링이 끝난 이후에 실행되도록 스케줄링된 이펙트들을 한꺼번에 실행합니다. (flush - 비우다)*/
+  /**
+   * @private
+   * @description flush effects
+   * 렌더링이 끝난 이후에 실행되도록 스케줄링된 이펙트들을 한꺼번에 실행합니다. (flush - 비우다)
+   */
   private flushEffects() {
     while (this.pendingEffectsQueue.length > 0) {
       this.pendingEffectsQueue.shift()?.();
@@ -480,6 +561,9 @@ class Freeact implements IFreeact {
     this.pendingEffectsQueue = [];
   }
 
+  /**
+   * @description useEffect
+   */
   public useEffect(callback: EffectCallback, deps: unknown[]) {
     if (!this.currentRenderingComponent) {
       throw new Error('useEffect can only be called inside a function component.');
@@ -533,6 +617,9 @@ class Freeact implements IFreeact {
     this.hookIndex++;
   }
 
+  /**
+   * @description render
+   */
   public render(virtualNode: VirtualNode, container: Element): void {
     this.reconcile(container, null, null, virtualNode);
 
