@@ -27,7 +27,7 @@ class Freeact implements IFreeact {
    * @private
    * @member hook index
    */
-  private hookIndex = 0;
+  private hookIndexInEachComponent = 0;
 
   /**
    * @private
@@ -119,7 +119,7 @@ class Freeact implements IFreeact {
   ): void {
     /** Context setting for rendering component. */
     this.currentRenderingComponent = newVirtualNode;
-    this.hookIndex = 0;
+    this.hookIndexInEachComponent = 0;
 
     /** 함수컴포넌트의 반환값 */
     let childOfFunctionComponent = (newVirtualNode?.type as Function)(newVirtualNode?.props);
@@ -153,7 +153,7 @@ class Freeact implements IFreeact {
     }
 
     this.currentRenderingComponent = virtualNode;
-    this.hookIndex = 0;
+    this.hookIndexInEachComponent = 0;
 
     /** 함수컴포넌트의 반환값 */
     let childOfFunctionComponent = (virtualNode?.type as Function)(virtualNode?.props);
@@ -434,7 +434,7 @@ class Freeact implements IFreeact {
       const nextProp = nextProps[key];
 
       if (!(key in nextProps) || prevProp !== nextProp) {
-        if (key.startsWith('on')) {
+        if (key.startsWith('on') && typeof prevProp === 'function') {
           /* 이전 렌더링 시점에 달려있었던 이벤트 */
           const eventName = this.convertToEventName(key);
 
@@ -468,11 +468,11 @@ class Freeact implements IFreeact {
         /* 이벤트: 이전 리스너가 있으면 교체 */
         const eventName = this.convertToEventName(key);
 
-        if (prevProp) {
+        if (typeof prevProp === 'function') {
           el.removeEventListener(eventName, prevProp as unknown as EventListener);
         }
 
-        if (nextProp && typeof nextProp === 'function') {
+        if (typeof nextProp === 'function') {
           el.addEventListener(eventName, nextProp);
           currentListeners[eventName] = nextProp;
         }
@@ -502,15 +502,15 @@ class Freeact implements IFreeact {
 
     const hooks = (this.currentRenderingComponent.hooks ||= []);
 
-    if (hooks.length <= this.hookIndex) {
+    if (hooks.length <= this.hookIndexInEachComponent) {
       hooks.push(defaultValue);
     }
 
     /** 현재 이 컴포넌트의 hooks에서 지금 인덱스에 저장된 상태 */
-    const state = hooks[this.hookIndex] as S;
+    const state = hooks[this.hookIndexInEachComponent] as S;
 
     /** 클로저 인덱스 */
-    const closureIndex = this.hookIndex;
+    const closureIndex = this.hookIndexInEachComponent;
 
     /**
      * 이 useState가 호출된 컴포넌트를 기억하는 클로저
@@ -519,7 +519,7 @@ class Freeact implements IFreeact {
      */
     const closureRenderingComponent = this.currentRenderingComponent;
 
-    this.hookIndex++;
+    this.hookIndexInEachComponent++;
 
     const setState = (updatedState: S | ((prev: S) => S)) => {
       if (typeof updatedState === 'function') {
@@ -572,13 +572,13 @@ class Freeact implements IFreeact {
     const hooks = (this.currentRenderingComponent.hooks ||= []);
 
     // 앱이 처음 렌더링되어 가상노드의 훅에 저장될 때
-    if (hooks.length <= this.hookIndex) {
+    if (hooks.length <= this.hookIndexInEachComponent) {
       const effect: Effect = { callback, deps, cleanup: undefined };
 
       hooks.push(effect);
       this.scheduleEffect(effect);
 
-      this.hookIndex++;
+      this.hookIndexInEachComponent++;
       return;
     }
 
@@ -588,7 +588,7 @@ class Freeact implements IFreeact {
     let isDepsChanged = false;
 
     /** 현재 훅 인덱스에 저장된 이펙트 정보 */
-    const currentIndexEffect = hooks[this.hookIndex] as Effect;
+    const currentIndexEffect = hooks[this.hookIndexInEachComponent] as Effect;
 
     /** 이전 의존성 배열 */
     const prevDeps = currentIndexEffect['deps'];
@@ -614,7 +614,7 @@ class Freeact implements IFreeact {
       this.scheduleEffect(currentIndexEffect);
     }
 
-    this.hookIndex++;
+    this.hookIndexInEachComponent++;
   }
 
   /**
