@@ -188,6 +188,11 @@ class Freeact implements IFreeact {
   /**
    * @private
    * @description reconcile old and new children by compare
+   *
+   * flow 1: oldChildren의 길이대로 for 문을 순회하면서 각 virtual node의 key를 map의 key, virtual node 객체를 value로 하여 map에 저장한다.
+   * flow 2: newVirtualChildren의 길이대로 for 문을 순회하면서, 각 virtual node의 key를 map에서 찾아 있으면 reconcile 메소드로 재조정(자식 노드의 업데이트)을 하고, 없으면 새로운 노드를 추가한다.
+   * flow 3: 이후 재조정이 끝난 후, 자식 노드의 순서가 변경되었을 수 있으므로, reorderChildren 메소드를 사용해 자식 노드의 순서를 변경한다.
+   * flow 4: 이후 남아있는 map의 key는 모두 제거하면서 reconcile 메소드를 사용해 실제 dom tree에서 제거한다.
    */
   private reconcileOldAndNewChildrenByCompare(
     parentRealNode: Node,
@@ -198,14 +203,18 @@ class Freeact implements IFreeact {
     /** Store old virtual children in map with their own key. */
     const oldChildrenMap = new Map<string | number, VirtualNode>();
 
-    // Store old virtual children in map with their own key.
+    /**
+     * @flow 1: Store old virtual children in map with their own key.
+     */
     for (let i = 0; i < oldVirtualChildren.length; i++) {
       const oldChild = oldVirtualChildren[i];
 
       oldChildrenMap.set(oldChild.props.key ?? i, oldChild);
     }
 
-    // Reconcile new virtual children with old virtual children.
+    /**
+     * @flow 2: Reconcile new virtual children with old virtual children.
+     */
     for (let i = 0; i < newVirtualChildren.length; i++) {
       const newChild = newVirtualChildren[i];
 
@@ -219,9 +228,14 @@ class Freeact implements IFreeact {
       oldChildrenMap.delete(newChildKey);
     }
 
+    /**
+     * @flow 3: Reorder children if the order of children has changed by insertBefore
+     */
     this.reorderChildren(parentRealNode, newVirtualChildren);
 
-    // Remove remaining old virtual children from real dom tree.
+    /**
+     * @flow 4: Remove remaining old virtual children from real dom tree.
+     */
     for (const key of oldChildrenMap.keys()) {
       this.reconcile(parentRealNode, parentVirtualNode, oldChildrenMap.get(key)!, null);
     }
@@ -594,7 +608,9 @@ class Freeact implements IFreeact {
 
     const hooks = (this.currentRenderingComponent.hooks ||= []);
 
-    // 앱이 처음 렌더링되어 가상노드의 훅에 저장될 때
+    /**
+     * @case 앱이 처음 렌더링되어 가상노드의 훅에 저장될 때
+     */
     if (hooks.length <= this.hookIndexInEachComponent) {
       const effect: Effect = { callback, deps, cleanup: undefined };
 
@@ -605,7 +621,9 @@ class Freeact implements IFreeact {
       return;
     }
 
-    // 초기 렌더가 아니어서, 이미 훅에 저장되어 있는 훅이 있을 때
+    /**
+     * @case 초기 렌더가 아니어서, 이미 훅에 저장되어 있는 훅이 있을 때
+     */
 
     /** 의존성 배열이 변경되었는지 여부 */
     let isDepsChanged = false;
