@@ -181,6 +181,7 @@ class Freeact implements IFreeact {
 
     this.currentRenderingComponent = null;
 
+    // 렌더링 완료 후 이펙트 큐에 들어있던 이펙트 실행
     this.flushEffects();
   }
 
@@ -645,6 +646,7 @@ class Freeact implements IFreeact {
   public render(virtualNode: VirtualNode, container: Element): void {
     this.reconcile(container, null, null, virtualNode);
 
+    // 렌더링 완료 후 이펙트 큐에 들어있던 이펙트 실행
     this.flushEffects();
   }
 }
