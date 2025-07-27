@@ -351,11 +351,13 @@ class Freeact implements IFreeact {
       /**
        * @description change position of the newRealNode if the order has changed by insertBefore or appendChild
        */
-      const newRealNode = parentNode.replaceChild(this.createElement(newVirtualNode!), oldVirtualNode!.realNode!);
+      const newRealNode = this.createElement(newVirtualNode!);
 
       newVirtualNode!.realNode = newRealNode;
 
-      this.reconcileChildren(newRealNode, parentVirtualNode, null, newVirtualNode!);
+      parentNode.replaceChild(newRealNode, oldVirtualNode!.realNode!);
+
+      this.reconcileChildren(newRealNode, parentVirtualNode, null, newVirtualNode);
       return;
     }
 
