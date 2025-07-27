@@ -8,6 +8,12 @@ interface IFreeact {
   render(element: VirtualNode, container: Element): void;
 }
 
+/**
+ * @class Freeact
+ * @description
+ * 이 클래스는 실제 리액트(v 16이하)를 흉내내어 가상돔 노드를 생성하고, 렌더링하는 클래스입니다.
+ * 리액트의 핵심 가치인 가상돔 트리를 만들어 상태변경에 따라 이전과 이후의 상태를 비교하고 이를 실제 돔트리에 반영하는 기능을 가진 클래스입니다.
+ */
 class Freeact implements IFreeact {
   /**
    * @private
@@ -183,7 +189,7 @@ class Freeact implements IFreeact {
    * @description reconcile old and new children by compare
    */
   private reconcileOldAndNewChildrenByCompare(
-    nodeToBeUpdated: Node,
+    parentRealNode: Node,
     parentVirtualNode: VirtualNode | null,
     oldVirtualChildren: VirtualNode[],
     newVirtualChildren: VirtualNode[],
@@ -206,20 +212,51 @@ class Freeact implements IFreeact {
 
       const oldChild = oldChildrenMap.get(newChildKey) ?? null;
 
-      /**
-       * @description 업데이트 되는 가상돔 트리에서 현재 트리의 다음 형제 노드
-       */
-      const nextSibling = newVirtualChildren[i + 1]?.realNode ?? null;
-
-      this.reconcile(nodeToBeUpdated, parentVirtualNode, oldChild, newChild, nextSibling);
+      this.reconcile(parentRealNode, parentVirtualNode, oldChild, newChild);
 
       // Remove old virtual child from map.
       oldChildrenMap.delete(newChildKey);
     }
 
+    this.reorderChildren(parentRealNode, newVirtualChildren);
+
     // Remove remaining old virtual children from real dom tree.
     for (const key of oldChildrenMap.keys()) {
-      this.reconcile(nodeToBeUpdated, parentVirtualNode, oldChildrenMap.get(key)!, null);
+      this.reconcile(parentRealNode, parentVirtualNode, oldChildrenMap.get(key)!, null);
+    }
+  }
+
+  /**
+   * @private
+   * @description reorder children if the order of children has changed by insertBefore
+   */
+  private reorderChildren(parentRealNode: Node, newVirtualChildren: VirtualNode[]) {
+    // 여기서 재조정을 한다면... (현재 이 함수 호출부 위에서 for문을 돌면서 newVirtualChildren의 realNode는 다 만들어진 싱황)
+    // 마지막 - 1 요소부터 그 앞 요소가 될 요소 앞에 insertBefore를 해준다.
+    // current: c a b -> b c a -> a b c
+    // to be: a b c
+
+    // current: b a d -> c b d
+    // to be: c b d
+
+    /**
+     * @todo - newVirtualChildren.length - 1인 가장 맨 끝 노드는 재조정이 필요없는지 재확인 필요!
+     * 현재는 newVirtualChildren.length - 2인 노드부터 계속 새로운 뒷자리 형제를 찾아 재조정을 하기 때문에 불필요하다고 판단함.
+     */
+    for (let i = newVirtualChildren.length - 2; i >= 0; i--) {
+      /** 현재 노드 */
+      const newChild = newVirtualChildren[i].realNode;
+
+      /** 이전 렌더링 시에 현재 노드의 다음 형제 노드 */
+      const currentNextSibling = newChild?.nextSibling;
+
+      /** 현재 렌더링 중에서 현재 노드의 다음 형제가 될 노드 */
+      const newNextSibling = newVirtualChildren[i + 1].realNode;
+
+      // 이전 렌더링 시에 현재 노드의 형제 노드와 다음 렌더링 시의 그것과 다르면, 현재 형제노드의 앞으로 위치를 변경합니다.
+      if (newChild && newNextSibling && currentNextSibling !== newNextSibling) {
+        parentRealNode.insertBefore(newChild, newNextSibling);
+      }
     }
   }
 
@@ -243,18 +280,6 @@ class Freeact implements IFreeact {
   }
 
   /**
-   * @private
-   * @description update node order in reconciliation process
-   */
-  private updateNodeOrder(parentNode: Node, realNode: Node, nextSibling: Node | null | undefined) {
-    if (nextSibling) {
-      parentNode.insertBefore(realNode, nextSibling);
-    } else {
-      parentNode.appendChild(realNode);
-    }
-  }
-
-  /**
    * @description 가상노드의 이전 노드와 새로운 노드를 비교합니다.
    * case 1: 새로운 노드가 없으면 이전 노드를 제거합니다.
    * case 2: 이전 노드가 없으면 새로운 노드를 추가합니다.
@@ -266,7 +291,6 @@ class Freeact implements IFreeact {
     parentVirtualNode: VirtualNode | null,
     oldVirtualNode: VirtualNode | null,
     newVirtualNode: VirtualNode | null,
-    nextSibling?: Node | null,
   ): void {
     if (newVirtualNode) {
       newVirtualNode.parentRealNode = parentNode;
@@ -307,8 +331,8 @@ class Freeact implements IFreeact {
 
       newVirtualNode.realNode = newRealNode;
 
-      // 재조정 과정에서 nextSibling이 있으면 그 위치에 추가하고, 없으면 맨 뒤에 추가
-      this.updateNodeOrder(parentNode, newRealNode, nextSibling);
+      // 처음 생긴 노드라면 부모의 맨 뒤에 추가합니다. (recondile 이후 reorderChildren 함수에서 위치를 변경합니다.)
+      parentNode?.appendChild(newRealNode);
 
       this.reconcileChildren(newRealNode, parentVirtualNode, null, newVirtualNode!);
       return;
@@ -331,8 +355,6 @@ class Freeact implements IFreeact {
 
       newVirtualNode!.realNode = newRealNode;
 
-      this.updateNodeOrder(parentNode, newRealNode, nextSibling);
-
       this.reconcileChildren(newRealNode, parentVirtualNode, null, newVirtualNode!);
       return;
     }
@@ -350,12 +372,10 @@ class Freeact implements IFreeact {
      */
     const realNode: Node = (newVirtualNode!.realNode = oldVirtualNode!.realNode)!;
 
-    this.updateNodeOrder(parentNode, realNode, nextSibling);
-
     if (newVirtualNode!.type === TEXT_ELEMENT) {
-      realNode!.textContent = String(newVirtualNode!.props.value);
+      realNode.textContent = String(newVirtualNode!.props.value);
     } else {
-      this.reconcileChildren(realNode!, parentVirtualNode, oldVirtualNode!, newVirtualNode!);
+      this.reconcileChildren(realNode, parentVirtualNode, oldVirtualNode!, newVirtualNode!);
     }
   }
 
