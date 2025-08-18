@@ -7,7 +7,7 @@ Freeact로 만든 데모 앱을 방문하려면 우클릭 후 "새 탭에서 열
 
 아래는 Freeact를 구현하면서 얻은 인사이트를 공유하기 위해 작성한 블로그 글입니다.
 
-[React 직접 구현해 본 후기](https://logdo.netlify.app/react/)
+[React 직접 구현해 본 후기](https://logdo.netlify.app/react/) //
 
 ## 프로젝트 개요
 
