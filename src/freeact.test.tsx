@@ -524,5 +524,402 @@ describe('Freeact', () => {
         freeact.useEffect(() => {}, []);
       }).toThrow('useEffect can only be called inside a function component');
     });
+
+    it('should throw error when useMemo called outside component', () => {
+      expect(() => {
+        freeact.useMemo(() => 0, []);
+      }).toThrow('useMemo can only be called inside a function component');
+    });
+  });
+
+  describe('useMemo Hook', () => {
+    it('should memoize a value', () => {
+      const computeFn = vi.fn(() => 'computed value');
+
+      const Component = () => {
+        const memoized = freeact.useMemo(() => computeFn(), []);
+        return <div>{memoized}</div>;
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toBe('computed value');
+      expect(computeFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should recompute when dependencies change', () => {
+      const computeFn = vi.fn((value: number) => value * 2);
+      let setValue: ((value: number) => void) | null = null;
+
+      const Component = () => {
+        const [value, setVal] = freeact.useState(5);
+        setValue = setVal;
+
+        const memoized = freeact.useMemo(() => computeFn(value), [value]);
+        return <div>{memoized}</div>;
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toBe('10');
+      expect(computeFn).toHaveBeenCalledTimes(1);
+
+      setValue!(10);
+      expect(container.textContent).toBe('20');
+      expect(computeFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not recompute when dependencies are the same', () => {
+      const computeFn = vi.fn((value: number) => value * 2);
+      let setOther: ((value: string) => void) | null = null;
+
+      const Component = () => {
+        const [value] = freeact.useState(5);
+        const [other, setOtherVal] = freeact.useState('test');
+        setOther = setOtherVal;
+
+        const memoized = freeact.useMemo(() => computeFn(value), [value]);
+        return (
+          <div>
+            {memoized}-{other}
+          </div>
+        );
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toBe('10-test');
+      expect(computeFn).toHaveBeenCalledTimes(1);
+
+      setOther!('changed');
+      expect(container.textContent).toBe('10-changed');
+      expect(computeFn).toHaveBeenCalledTimes(1); // Should not recompute
+    });
+
+    it('should handle object returns', () => {
+      const computeFn = vi.fn((a: number, b: number) => ({ sum: a + b, product: a * b }));
+      let setValue: ((value: number) => void) | null = null;
+
+      const Component = () => {
+        const [value, setVal] = freeact.useState(2);
+        setValue = setVal;
+
+        const result = freeact.useMemo(() => computeFn(value, 3), [value]);
+        return (
+          <div>
+            {result.sum}-{result.product}
+          </div>
+        );
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toBe('5-6');
+      expect(computeFn).toHaveBeenCalledTimes(1);
+
+      setValue!(4);
+      expect(container.textContent).toBe('7-12');
+      expect(computeFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should support multiple useMemo hooks in same component', () => {
+      const compute1 = vi.fn((x: number) => x * 2);
+      const compute2 = vi.fn((x: number) => x + 10);
+
+      let setValue: ((value: number) => void) | null = null;
+
+      const Component = () => {
+        const [value, setVal] = freeact.useState(5);
+        setValue = setVal;
+
+        const memo1 = freeact.useMemo(() => compute1(value), [value]);
+        const memo2 = freeact.useMemo(() => compute2(value), [value]);
+
+        return (
+          <div>
+            {memo1}-{memo2}
+          </div>
+        );
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toBe('10-15');
+      expect(compute1).toHaveBeenCalledTimes(1);
+      expect(compute2).toHaveBeenCalledTimes(1);
+
+      setValue!(3);
+      expect(container.textContent).toBe('6-13');
+      expect(compute1).toHaveBeenCalledTimes(2);
+      expect(compute2).toHaveBeenCalledTimes(2);
+    });
+
+    it('should work with useState', () => {
+      const computeFn = vi.fn((items: string[]) => items.length);
+      let setItems: ((value: string[]) => void) | null = null;
+
+      const Component = () => {
+        const [items, setItemsValue] = freeact.useState(['a', 'b']);
+        setItems = setItemsValue;
+
+        const count = freeact.useMemo(() => computeFn(items), [items]);
+        return <div>{count}</div>;
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toBe('2');
+      expect(computeFn).toHaveBeenCalledTimes(1);
+
+      setItems!(['a', 'b', 'c']);
+      expect(container.textContent).toBe('3');
+      expect(computeFn).toHaveBeenCalledTimes(2);
+
+      // Update with same value should not recompute
+      setItems!(['a', 'b', 'c']);
+      expect(container.textContent).toBe('3');
+      expect(computeFn).toHaveBeenCalledTimes(3); // New array object reference
+    });
+
+    it('should compute only once with empty dependency array', () => {
+      const computeFn = vi.fn(() => 'once');
+      let setDummy: ((value: number) => void) | null = null;
+
+      const Component = () => {
+        const [dummy, setD] = freeact.useState(0);
+        setDummy = setD;
+
+        const memoized = freeact.useMemo(() => computeFn(), []);
+        return (
+          <div>
+            {memoized}-{dummy}
+          </div>
+        );
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toBe('once-0');
+      expect(computeFn).toHaveBeenCalledTimes(1);
+
+      setDummy!(1);
+      expect(container.textContent).toBe('once-1');
+      expect(computeFn).toHaveBeenCalledTimes(1); // Should not recompute
+    });
+
+    it('should handle array returns', () => {
+      const computeFn = vi.fn((n: number) => [n, n + 1, n + 2]);
+      let setValue: ((value: number) => void) | null = null;
+
+      const Component = () => {
+        const [value, setVal] = freeact.useState(1);
+        setValue = setVal;
+
+        const arr = freeact.useMemo(() => computeFn(value), [value]);
+        return <div>{arr.join('-')}</div>;
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toBe('1-2-3');
+      expect(computeFn).toHaveBeenCalledTimes(1);
+
+      setValue!(5);
+      expect(container.textContent).toBe('5-6-7');
+      expect(computeFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle primitives and complex types', () => {
+      const computeFn = vi.fn((type: string) => {
+        if (type === 'number') return 42;
+        if (type === 'string') return 'hello';
+        if (type === 'object') return { key: 'value' };
+        return null;
+      });
+
+      let setType: ((value: string) => void) | null = null;
+
+      const Component = () => {
+        const [type, setTypeVal] = freeact.useState('number');
+        setType = setTypeVal;
+
+        const result = freeact.useMemo(() => computeFn(type), [type]);
+        return <div>{String(result)}</div>;
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toBe('42');
+
+      setType!('string');
+      expect(container.textContent).toBe('hello');
+
+      setType!('object');
+      expect(container.textContent).toBe('[object Object]');
+    });
+
+    it('should work with useEffect together', () => {
+      const computeFn = vi.fn((value: number) => value * 3);
+      const effectFn = vi.fn();
+      let setValue: ((value: number) => void) | null = null;
+
+      const Component = () => {
+        const [value, setVal] = freeact.useState(2);
+        setValue = setVal;
+
+        const memoized = freeact.useMemo(() => computeFn(value), [value]);
+
+        freeact.useEffect(() => {
+          effectFn(memoized);
+        }, [memoized]);
+
+        return <div>{memoized}</div>;
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toBe('6');
+      expect(computeFn).toHaveBeenCalledTimes(1);
+      expect(effectFn).toHaveBeenCalledWith(6);
+      expect(effectFn).toHaveBeenCalledTimes(1);
+
+      setValue!(3);
+      expect(container.textContent).toBe('9');
+      expect(computeFn).toHaveBeenCalledTimes(2);
+      expect(effectFn).toHaveBeenCalledWith(9);
+      expect(effectFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should preserve reference identity across renders when deps are same', () => {
+      const referenceChecks: Array<{ isIdentical: boolean }> = [];
+
+      const Component = () => {
+        const [count, setCount] = freeact.useState(0);
+
+        const obj = freeact.useMemo(() => ({ value: 'constant' }), []);
+
+        // Store reference to check identity
+        if (referenceChecks.length === 0 || referenceChecks[referenceChecks.length - 1].isIdentical === false) {
+          referenceChecks.push({ isIdentical: true });
+        }
+
+        return (
+          <div>
+            <p>{obj.value}</p>
+            <button
+              onClick={() => {
+                setCount(count + 1);
+                // Check if obj reference changed by rendering again
+                referenceChecks[referenceChecks.length - 1].isIdentical = true;
+              }}
+            >
+              Click
+            </button>
+            <span>{count}</span>
+          </div>
+        );
+      };
+
+      freeact.render(<Component />, container);
+      expect(container.textContent).toContain('constant');
+
+      const button = container.querySelector('button') as HTMLButtonElement;
+      button.click();
+
+      expect(container.textContent).toContain('1');
+    });
+
+    it('should not recalculate counts when filter changes but todos unchanged', () => {
+      const computeCountsFn = vi.fn((todos: any[]) => {
+        const active = todos.filter((t) => !t.completed).length;
+        const completed = todos.filter((t) => t.completed).length;
+        return { activeCount: active, completedCount: completed };
+      });
+
+      let setFilter: ((value: 'all' | 'active' | 'completed') => void) | null = null;
+
+      const TodoApp = () => {
+        const [todos] = freeact.useState([
+          { id: 1, text: 'Task 1', completed: false },
+          { id: 2, text: 'Task 2', completed: true },
+          { id: 3, text: 'Task 3', completed: false },
+        ]);
+
+        const [filter, setFilterValue] = freeact.useState<'all' | 'active' | 'completed'>('all');
+        setFilter = setFilterValue;
+
+        // Memoize counts (depends only on todos, not filter)
+        const { activeCount, completedCount } = freeact.useMemo(() => computeCountsFn(todos), [todos]);
+
+        return (
+          <div>
+            <div>
+              {activeCount}-{completedCount}
+            </div>
+            <button onClick={() => setFilterValue('active')}>Active</button>
+            <button onClick={() => setFilterValue('completed')}>Completed</button>
+            <button onClick={() => setFilterValue('all')}>All</button>
+            <p>{filter}</p>
+          </div>
+        );
+      };
+
+      freeact.render(<TodoApp />, container);
+      expect(container.textContent).toContain('2-1'); // 2 active, 1 completed
+      expect(computeCountsFn).toHaveBeenCalledTimes(1);
+
+      // Change filter (should NOT recalculate counts)
+      setFilter!('active');
+      expect(container.textContent).toContain('active');
+      expect(computeCountsFn).toHaveBeenCalledTimes(1); // Still 1, not recalculated
+
+      // Change filter again (should still NOT recalculate)
+      setFilter!('completed');
+      expect(container.textContent).toContain('completed');
+      expect(computeCountsFn).toHaveBeenCalledTimes(1); // Still 1, not recalculated
+
+      // Change filter back (should still NOT recalculate)
+      setFilter!('all');
+      expect(container.textContent).toContain('all');
+      expect(computeCountsFn).toHaveBeenCalledTimes(1); // Still 1, not recalculated
+    });
+
+    it('should recalculate counts only when todos change', () => {
+      const computeCountsFn = vi.fn((todos: any[]) => {
+        const active = todos.filter((t) => !t.completed).length;
+        const completed = todos.filter((t) => t.completed).length;
+        return { activeCount: active, completedCount: completed };
+      });
+
+      let setTodos: ((value: any[]) => void) | null = null;
+
+      const TodoApp = () => {
+        const [todos, setTodosValue] = freeact.useState([
+          { id: 1, text: 'Task 1', completed: false },
+          { id: 2, text: 'Task 2', completed: true },
+        ]);
+        setTodos = setTodosValue;
+
+        const { activeCount, completedCount } = freeact.useMemo(() => computeCountsFn(todos), [todos]);
+
+        return (
+          <div>
+            {activeCount}-{completedCount}
+          </div>
+        );
+      };
+
+      freeact.render(<TodoApp />, container);
+      expect(container.textContent).toBe('1-1');
+      expect(computeCountsFn).toHaveBeenCalledTimes(1);
+
+      // Add new todo (should recalculate)
+      setTodos!([
+        { id: 1, text: 'Task 1', completed: false },
+        { id: 2, text: 'Task 2', completed: true },
+        { id: 3, text: 'Task 3', completed: false },
+      ]);
+      expect(container.textContent).toBe('2-1');
+      expect(computeCountsFn).toHaveBeenCalledTimes(2);
+
+      // Complete a todo (should recalculate)
+      setTodos!([
+        { id: 1, text: 'Task 1', completed: true },
+        { id: 2, text: 'Task 2', completed: true },
+        { id: 3, text: 'Task 3', completed: false },
+      ]);
+      expect(container.textContent).toBe('1-2');
+      expect(computeCountsFn).toHaveBeenCalledTimes(3);
+    });
   });
 });

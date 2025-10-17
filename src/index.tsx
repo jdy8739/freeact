@@ -120,14 +120,21 @@ const TodoList = () => {
     setTodos((prev) => prev.filter((todo) => !todo.completed));
   };
 
-  const filteredTodos = todos.filter((todo) => {
-    if (filter === 'active') return !todo.completed;
-    if (filter === 'completed') return todo.completed;
-    return true;
-  });
+  // Memoize filtered todos to avoid recalculating on every render
+  const filteredTodos = freeact.useMemo(() => {
+    return todos.filter((todo) => {
+      if (filter === 'active') return !todo.completed;
+      if (filter === 'completed') return todo.completed;
+      return true;
+    });
+  }, [todos, filter]);
 
-  const activeCount = todos.filter((todo) => !todo.completed).length;
-  const completedCount = todos.filter((todo) => todo.completed).length;
+  // Memoize counts to avoid recalculating on every render
+  const { activeCount, completedCount } = freeact.useMemo(() => {
+    const active = todos.filter((todo) => !todo.completed).length;
+    const completed = todos.filter((todo) => todo.completed).length;
+    return { activeCount: active, completedCount: completed };
+  }, [todos]);
 
   return (
     <div

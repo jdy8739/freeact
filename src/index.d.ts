@@ -72,4 +72,15 @@ type Effect = {
   deps: unknown[];
 };
 
-export type { VirtualNode, VirtualElement, Key, EffectCallback, Effect };
+/**
+ * @type {Memo}
+ * memoized value storage for useMemo hook
+ * @field value - memoized computed value
+ * @field deps - dependency array to track when to recompute
+ */
+type Memo<T> = {
+  value: T;
+  deps: unknown[];
+};
+
+export type { VirtualNode, VirtualElement, Key, EffectCallback, Effect, Memo };

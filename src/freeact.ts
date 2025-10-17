@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
-import { VirtualNode, VirtualElement, Key, Effect, EffectCallback } from './index.d';
+import { VirtualNode, VirtualElement, Key, Effect, EffectCallback, Memo } from './index.d';
 
 const TEXT_ELEMENT = 'TEXT_ELEMENT';
 
@@ -801,6 +801,62 @@ class Freeact implements IFreeact {
     }
 
     this.hookIndexInEachComponent++;
+  }
+
+  /**
+   * React-style memo hook for memoizing expensive computations
+   *
+   * @template T - Memoized value type
+   * @param callback - Function that computes and returns the value to memoize
+   * @param deps - Dependency array (recomputes when dependencies change)
+   * @returns Memoized value that only recomputes when dependencies change
+   * @throws Error if called outside a function component
+   *
+   * @example
+   * ```tsx
+   * const expensiveValue = freeact.useMemo(() => {
+   *   return largeList.filter(item => item.active).map(item => item.name)
+   * }, [largeList])
+   * ```
+   */
+  public useMemo<T>(callback: () => T, deps: unknown[]): T {
+    this.validateHookContext('useMemo');
+
+    const hooks = (this.currentRenderingComponent!.hooks ||= []);
+
+    /**
+     * @case First time calling this hook for this component
+     */
+    if (hooks.length <= this.hookIndexInEachComponent) {
+      const value = callback();
+      const memo: Memo<T> = { value, deps };
+
+      hooks.push(memo);
+
+      this.hookIndexInEachComponent++;
+      return value;
+    }
+
+    /**
+     * @case Hook already exists from previous render
+     */
+    const currentMemo = hooks[this.hookIndexInEachComponent] as Memo<T>;
+
+    /** Previous dependency array */
+    const prevDeps = currentMemo.deps;
+
+    /** Check if dependencies have changed */
+    const isDepsChanged = !this.areDepsEqual(prevDeps, deps);
+
+    if (isDepsChanged) {
+      // Recompute if dependencies changed
+      const newValue = callback();
+      currentMemo.value = newValue;
+      currentMemo.deps = deps;
+    }
+
+    this.hookIndexInEachComponent++;
+    return currentMemo.value;
   }
 
   /**
