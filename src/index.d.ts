@@ -89,8 +89,7 @@ type Memo<T> = {
  * @field callback - memoized callback function
  * @field deps - dependency array to track when to create new callback
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type MemoizedCallback<T extends (...args: any[]) => any> = {
+type MemoizedCallback<T> = {
   callback: T;
   deps: unknown[];
 };

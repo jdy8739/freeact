@@ -820,7 +820,11 @@ describe('Freeact', () => {
     });
 
     it('should not recalculate counts when filter changes but todos unchanged', () => {
-      const computeCountsFn = vi.fn((todos: any[]) => {
+      interface Todo {
+        completed: boolean;
+      }
+
+      const computeCountsFn = vi.fn((todos: Todo[]) => {
         const active = todos.filter((t) => !t.completed).length;
         const completed = todos.filter((t) => t.completed).length;
         return { activeCount: active, completedCount: completed };
@@ -875,16 +879,22 @@ describe('Freeact', () => {
     });
 
     it('should recalculate counts only when todos change', () => {
-      const computeCountsFn = vi.fn((todos: any[]) => {
+      interface TodoItem {
+        id: number;
+        text: string;
+        completed: boolean;
+      }
+
+      const computeCountsFn = vi.fn((todos: TodoItem[]) => {
         const active = todos.filter((t) => !t.completed).length;
         const completed = todos.filter((t) => t.completed).length;
         return { activeCount: active, completedCount: completed };
       });
 
-      let setTodos: ((value: any[]) => void) | null = null;
+      let setTodos: ((value: TodoItem[]) => void) | null = null;
 
       const TodoApp = () => {
-        const [todos, setTodosValue] = freeact.useState([
+        const [todos, setTodosValue] = freeact.useState<TodoItem[]>([
           { id: 1, text: 'Task 1', completed: false },
           { id: 2, text: 'Task 2', completed: true },
         ]);
@@ -1183,8 +1193,15 @@ describe('Freeact', () => {
     });
 
     it('should work with complex function signatures', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const callbacks: Array<(...args: any[]) => any> = [];
+      interface ComplexResult {
+        num: number;
+        str: string;
+        obj: { key: string };
+      }
+
+      type ComplexCallback = (a: number, b: string, c: { key: string }) => ComplexResult;
+
+      const callbacks: ComplexCallback[] = [];
 
       const Component = () => {
         // Callback with multiple params

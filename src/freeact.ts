@@ -875,8 +875,7 @@ class Freeact implements IFreeact {
    * }, [userId])
    * ```
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public useCallback<T extends (...args: any[]) => any>(callback: T, deps: unknown[]): T {
+  public useCallback<T>(callback: T, deps: unknown[]): T {
     this.validateHookContext('useCallback');
 
     const hooks = (this.currentRenderingComponent!.hooks ||= []);
