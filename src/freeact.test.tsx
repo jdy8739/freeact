@@ -1055,12 +1055,9 @@ describe('Freeact', () => {
           [value],
         );
 
-        const cb2 = freeact.useCallback(
-          (msg: string) => {
-            console.log(msg);
-          },
-          [],
-        );
+        const cb2 = freeact.useCallback((msg: string) => {
+          console.log(msg);
+        }, []);
 
         triggerCb1 = cb1;
         // Use cb2 to avoid unused variable warning
