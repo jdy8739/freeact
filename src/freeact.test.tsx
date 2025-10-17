@@ -1034,21 +1034,27 @@ describe('Freeact', () => {
 
     it('should support multiple useCallback hooks in same component', () => {
       let triggerCb1: ((x: number) => void) | null = null;
-      let triggerCb2: ((x: string) => void) | null = null;
 
       const Component = () => {
         const [value, setValue] = freeact.useState(0);
 
-        const cb1 = freeact.useCallback((x: number) => {
-          setValue(value + x);
-        }, [value]);
+        const cb1 = freeact.useCallback(
+          (x: number) => {
+            setValue(value + x);
+          },
+          [value],
+        );
 
-        const cb2 = freeact.useCallback((msg: string) => {
-          console.log(msg);
-        }, []);
+        const cb2 = freeact.useCallback(
+          (msg: string) => {
+            console.log(msg);
+          },
+          [],
+        );
 
         triggerCb1 = cb1;
-        triggerCb2 = cb2;
+        // Use cb2 to avoid unused variable warning
+        void cb2;
 
         return <div>{value}</div>;
       };
@@ -1100,9 +1106,12 @@ describe('Freeact', () => {
       const Counter = () => {
         const [count, setCount] = freeact.useState(0);
 
-        const increment = freeact.useCallback((amount: number) => {
-          setCount(count + amount);
-        }, [count]);
+        const increment = freeact.useCallback(
+          (amount: number) => {
+            setCount(count + amount);
+          },
+          [count],
+        );
 
         triggerCallback = increment;
 
@@ -1154,7 +1163,7 @@ describe('Freeact', () => {
       let triggerCallback: ((x: number) => number) | null = null;
 
       const Component = () => {
-        const [multiplier, setMultiplier] = freeact.useState(2);
+        const [multiplier] = freeact.useState(2);
 
         const multiply = freeact.useCallback((x: number) => x * multiplier, [multiplier]);
 
@@ -1165,9 +1174,6 @@ describe('Freeact', () => {
 
       freeact.render(<Component />, container);
       expect(triggerCallback!(5)).toBe(10); // 5 * 2
-
-      // Update multiplier (callback should update internally)
-      // This is tricky to test without manually managing component state
     });
 
     it('should throw error when called outside component', () => {
@@ -1177,7 +1183,8 @@ describe('Freeact', () => {
     });
 
     it('should work with complex function signatures', () => {
-      const callbacks: Function[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const callbacks: Array<(...args: any[]) => any> = [];
 
       const Component = () => {
         // Callback with multiple params
@@ -1220,7 +1227,11 @@ describe('Freeact', () => {
         const add = freeact.useCallback(() => a + b, [a, b]);
         triggerCallback = add;
 
-        return <div>{a}-{b}</div>;
+        return (
+          <div>
+            {a}-{b}
+          </div>
+        );
       };
 
       freeact.render(<Component />, container);
@@ -1237,7 +1248,7 @@ describe('Freeact', () => {
       let getValues: (() => { count: number; callback: () => number }) | null = null;
 
       const Component = () => {
-        const [count, setCount] = freeact.useState(5);
+        const [count] = freeact.useState(5);
 
         // useCallback for function
         const getCount = freeact.useCallback(() => count * 2, [count]);
