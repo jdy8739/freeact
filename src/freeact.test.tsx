@@ -499,7 +499,7 @@ describe('Freeact', () => {
       expect(container.innerHTML).toBe('<div></div>');
     });
 
-    it('should handle boolean children', () => {
+    it('should filter out boolean children', () => {
       const element = (
         <div>
           {true}
@@ -509,8 +509,8 @@ describe('Freeact', () => {
       );
       freeact.render(element, container);
 
-      // Booleans should be converted to text
-      expect(container.textContent).toBe('trueTextfalse');
+      // Booleans should be filtered out (React behavior)
+      expect(container.textContent).toBe('Text');
     });
 
     it('should throw error when useState called outside component', () => {

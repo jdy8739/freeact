@@ -147,7 +147,7 @@ class Freeact implements IFreeact {
     ...children: unknown[]
   ): VirtualNode {
     const childrenElements = children
-      .filter((child) => child !== null && child !== undefined)
+      .filter((child) => child !== null && child !== undefined && typeof child !== 'boolean')
       .map((child) => {
         if (typeof child === 'object') {
           return child as VirtualNode;
