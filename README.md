@@ -149,15 +149,33 @@ npm start
 npm run build
 ```
 
+### 테스트 실행
+
+```bash
+npm test
+```
+
+32개의 테스트로 핵심 기능 검증:
+- 기본 렌더링 및 컴포넌트
+- useState/useEffect 훅
+- 이벤트 처리
+- 재조정 및 키 기반 리스트
+- 스타일 업데이트
+- 엣지 케이스 처리
+
 ## 프로젝트 구조
 
 ```
 src/
-├── freeact.ts      # 핵심 FreeAct 라이브러리 구현
+├── freeact.ts      # 핵심 FreeAct 라이브러리 구현 (JSDoc 포함)
+├── freeact.test.tsx # 테스트 슈트 (32 테스트)
 ├── index.d.ts      # TypeScript 타입 정의
 └── index.tsx       # 데모 애플리케이션
 
 dist/               # 빌드 출력 디렉토리
+
+REORDERING_ALGORITHM.md  # 재조정 알고리즘 상세 문서
+CLAUDE.md                # 프로젝트 가이드 (AI 도우미용)
 ```
 
 ## 제한사항
