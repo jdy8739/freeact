@@ -74,6 +74,14 @@ class Freeact implements IFreeact {
 
   /**
    * @private
+   * @description check if prop key is reserved for internal use
+   */
+  private isReservedProp(key: string): boolean {
+    return key === PROP_CHILDREN || key === PROP_KEY;
+  }
+
+  /**
+   * @private
    * @description create text element
    */
   private createTextElement(text: string): VirtualNode {
@@ -153,7 +161,7 @@ class Freeact implements IFreeact {
     virtualNode.realNode = realNode;
 
     for (const key in virtualNode.props) {
-      if (key === PROP_CHILDREN || key === PROP_KEY) {
+      if (this.isReservedProp(key)) {
         continue;
       }
 
@@ -485,32 +493,16 @@ class Freeact implements IFreeact {
 
   /**
    * @private
-   * @description update virtual node props
+   * @description remove old props that are no longer in nextProps
    */
-  private updateVirtualNodeProps(
-    element: Node,
+  private removeOldProps(
+    el: HTMLElement,
     prevProps: Record<string, unknown>,
     nextProps: Record<string, unknown>,
+    currentListeners: Record<string, EventListener>,
   ) {
-    // Only proceed if dom is an Element (not a Text node)
-    if (!(element instanceof Element)) {
-      return;
-    }
-
-    const el = element as HTMLElement;
-
-    /**
-     * 전역 WeakMap<HTMLElement, Record<string, EventListener>>
-     * 각 노드에 연결된 이벤트 리스너를 추적해
-     * 중복 바인딩과 메모리 누수를 방지합니다.
-     */
-    const currentListeners = this.eventListeners.get(el) ?? {};
-
-    /* ------------------------------------------------------------------
-     * 1단계: nextProps에 사라졌거나 값이 달라진 이전 속성·리스너 제거
-     * ----------------------------------------------------------------*/
     Object.keys(prevProps).forEach((key) => {
-      if (key === PROP_CHILDREN || key === PROP_KEY) return; // 가상 DOM 전용 필드
+      if (this.isReservedProp(key)) return; // 가상 DOM 전용 필드
 
       const prevProp = prevProps[key];
       const nextProp = nextProps[key];
@@ -533,12 +525,20 @@ class Freeact implements IFreeact {
         }
       }
     });
+  }
 
-    /* ------------------------------------------------------------------
-     * 2단계: 새로 추가되었거나 값이 바뀐 속성·리스너 적용
-     * ----------------------------------------------------------------*/
+  /**
+   * @private
+   * @description apply new props to element
+   */
+  private applyNewProps(
+    el: HTMLElement,
+    prevProps: Record<string, unknown>,
+    nextProps: Record<string, unknown>,
+    currentListeners: Record<string, EventListener>,
+  ) {
     Object.keys(nextProps).forEach((key) => {
-      if (key === PROP_CHILDREN || key === PROP_KEY) return;
+      if (this.isReservedProp(key)) return;
 
       const prevProp = prevProps[key] as unknown as Record<string, unknown>;
       const nextProp = nextProps[key] as unknown as Record<string, unknown>;
@@ -564,7 +564,7 @@ class Freeact implements IFreeact {
         // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         nextProp ? el.setAttribute('class', String(nextProp)) : el.removeAttribute('class');
       } else {
-        /* 일반 속성: boolean true → 빈 문자열, false/null/undefined → 제거 */
+        /* 일반 속성: boolean true → 빈 문자열, false/null/undefined → 제거 */
         if (nextProp === null || nextProp === undefined || (nextProp as unknown as boolean) === false) {
           el.removeAttribute(key);
         } else {
@@ -575,14 +575,49 @@ class Freeact implements IFreeact {
   }
 
   /**
+   * @private
+   * @description update virtual node props
+   */
+  private updateVirtualNodeProps(
+    element: Node,
+    prevProps: Record<string, unknown>,
+    nextProps: Record<string, unknown>,
+  ) {
+    // Only proceed if dom is an Element (not a Text node)
+    if (!(element instanceof Element)) {
+      return;
+    }
+
+    const el = element as HTMLElement;
+
+    /**
+     * 전역 WeakMap<HTMLElement, Record<string, EventListener>>
+     * 각 노드에 연결된 이벤트 리스너를 추적해
+     * 중복 바인딩과 메모리 누수를 방지합니다.
+     */
+    const currentListeners = this.eventListeners.get(el) ?? {};
+
+    this.removeOldProps(el, prevProps, nextProps, currentListeners);
+    this.applyNewProps(el, prevProps, nextProps, currentListeners);
+  }
+
+  /**
+   * @private
+   * @description validate that hook is called within a component context
+   */
+  private validateHookContext(hookName: string): void {
+    if (!this.currentRenderingComponent) {
+      throw new Error(`${hookName} can only be called inside a function component.`);
+    }
+  }
+
+  /**
    * @description useState
    */
   public useState<S>(defaultValue: S | (() => S)): [S, (value: S | ((prev: S) => S)) => void] {
-    if (!this.currentRenderingComponent) {
-      throw new Error('useState can only be called inside a function component.');
-    }
+    this.validateHookContext('useState');
 
-    const hooks = (this.currentRenderingComponent.hooks ||= []);
+    const hooks = (this.currentRenderingComponent!.hooks ||= []);
 
     if (hooks.length <= this.hookIndexInEachComponent) {
       // Lazy initialization: if defaultValue is a function, call it to get the initial value
@@ -620,6 +655,24 @@ class Freeact implements IFreeact {
 
   /**
    * @private
+   * @description compare two dependency arrays for equality
+   */
+  private areDepsEqual(prevDeps: unknown[] | undefined, nextDeps: unknown[] | undefined): boolean {
+    if (!prevDeps || !nextDeps || prevDeps.length !== nextDeps.length) {
+      return false;
+    }
+
+    for (let i = 0; i < prevDeps.length; i++) {
+      if (!Object.is(prevDeps[i], nextDeps[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * @private
    * @description schedule effect
    */
   private scheduleEffect(effect: Effect) {
@@ -649,11 +702,9 @@ class Freeact implements IFreeact {
    * @description useEffect
    */
   public useEffect(callback: EffectCallback, deps: unknown[]) {
-    if (!this.currentRenderingComponent) {
-      throw new Error('useEffect can only be called inside a function component.');
-    }
+    this.validateHookContext('useEffect');
 
-    const hooks = (this.currentRenderingComponent.hooks ||= []);
+    const hooks = (this.currentRenderingComponent!.hooks ||= []);
 
     /**
      * @case 앱이 처음 렌더링되어 가상노드의 훅에 저장될 때
@@ -672,26 +723,14 @@ class Freeact implements IFreeact {
      * @case 초기 렌더가 아니어서, 이미 훅에 저장되어 있는 훅이 있을 때
      */
 
-    /** 의존성 배열이 변경되었는지 여부 */
-    let isDepsChanged = false;
-
     /** 현재 훅 인덱스에 저장된 이펙트 정보 */
     const currentIndexEffect = hooks[this.hookIndexInEachComponent] as Effect;
 
     /** 이전 의존성 배열 */
     const prevDeps = currentIndexEffect['deps'];
 
-    /** 이전 의존성 배열이 없거나 새로운 의존성 배열이 없거나 길이가 다르면 의존성 배열이 변경되었다고 판단 */
-    if (!prevDeps || !deps || prevDeps.length !== deps.length) {
-      isDepsChanged = true;
-    } else {
-      for (let i = 0; i < prevDeps.length; i++) {
-        if (!Object.is(prevDeps[i], deps[i])) {
-          isDepsChanged = true;
-          break;
-        }
-      }
-    }
+    /** 의존성 배열이 변경되었는지 여부 */
+    const isDepsChanged = !this.areDepsEqual(prevDeps, deps);
 
     if (isDepsChanged) {
       // 의존성 배열이 변경되었으므로 이펙트 정보를 업데이트
