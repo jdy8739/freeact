@@ -428,4 +428,101 @@ describe('Freeact', () => {
       expect(div.style.margin).toBe('');
     });
   });
+
+  describe('Edge Cases', () => {
+    it('should filter null and undefined children', () => {
+      const element = (
+        <div>
+          {null}
+          <span>visible</span>
+          {undefined}
+          <p>also visible</p>
+        </div>
+      );
+      freeact.render(element, container);
+
+      expect(container.querySelector('span')?.textContent).toBe('visible');
+      expect(container.querySelector('p')?.textContent).toBe('also visible');
+      expect(container.textContent).toBe('visiblealso visible');
+    });
+
+    it('should support lazy state initialization', () => {
+      const expensiveInit = vi.fn(() => 100);
+
+      const Component = () => {
+        const [value] = freeact.useState(expensiveInit);
+        return <div>{value}</div>;
+      };
+
+      freeact.render(<Component />, container);
+      expect(expensiveInit).toHaveBeenCalledTimes(1);
+      expect(container.textContent).toBe('100');
+    });
+
+    it('should handle rapid state updates', () => {
+      let setValue: ((value: number) => void) | null = null;
+
+      const Component = () => {
+        const [count, setCount] = freeact.useState(0);
+        setValue = setCount;
+        return <div>{count}</div>;
+      };
+
+      freeact.render(<Component />, container);
+
+      // Rapid updates
+      setValue!(1);
+      setValue!(2);
+      setValue!(3);
+
+      expect(container.textContent).toBe('3');
+    });
+
+    it('should handle nested function components', () => {
+      const Inner = ({ text }: { text: string }) => <span>{text}</span>;
+      const Middle = ({ text }: { text: string }) => (
+        <div>
+          <Inner text={text} />
+        </div>
+      );
+      const Outer = () => <Middle text="nested" />;
+
+      freeact.render(<Outer />, container);
+
+      expect(container.querySelector('span')?.textContent).toBe('nested');
+    });
+
+    it('should handle empty children array', () => {
+      const element = <div>{[]}</div>;
+      freeact.render(element, container);
+
+      expect(container.innerHTML).toBe('<div></div>');
+    });
+
+    it('should handle boolean children', () => {
+      const element = (
+        <div>
+          {true}
+          Text
+          {false}
+        </div>
+      );
+      freeact.render(element, container);
+
+      // Booleans should be converted to text
+      expect(container.textContent).toBe('trueTextfalse');
+    });
+
+    it('should throw error when useState called outside component', () => {
+      expect(() => {
+        freeact.useState(0);
+      }).toThrow('useState can only be called inside a function component');
+    });
+
+    it('should throw error when useEffect called outside component', () => {
+      expect(() => {
+        freeact.useEffect(() => {}, []);
+      }).toThrow('useEffect can only be called inside a function component');
+    });
+  });
 });
