@@ -83,4 +83,16 @@ type Memo<T> = {
   deps: unknown[];
 };
 
-export type { VirtualNode, VirtualElement, Key, EffectCallback, Effect, Memo };
+/**
+ * @type {MemoizedCallback}
+ * memoized callback storage for useCallback hook
+ * @field callback - memoized callback function
+ * @field deps - dependency array to track when to create new callback
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MemoizedCallback<T extends (...args: any[]) => any> = {
+  callback: T;
+  deps: unknown[];
+};
+
+export type { VirtualNode, VirtualElement, Key, EffectCallback, Effect, Memo, MemoizedCallback };

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
-import { VirtualNode, VirtualElement, Key, Effect, EffectCallback, Memo } from './index.d';
+import { VirtualNode, VirtualElement, Key, Effect, EffectCallback, Memo, MemoizedCallback } from './index.d';
 
 const TEXT_ELEMENT = 'TEXT_ELEMENT';
 
@@ -857,6 +857,61 @@ class Freeact implements IFreeact {
 
     this.hookIndexInEachComponent++;
     return currentMemo.value;
+  }
+
+  /**
+   * React-style callback hook for memoizing callback functions
+   *
+   * @template T - Callback function type
+   * @param callback - Function to memoize
+   * @param deps - Dependency array (returns new function when dependencies change)
+   * @returns Memoized callback that maintains reference identity when deps unchanged
+   * @throws Error if called outside a function component
+   *
+   * @example
+   * ```tsx
+   * const handleClick = freeact.useCallback((id: number) => {
+   *   console.log('Clicked', id)
+   * }, [userId])
+   * ```
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public useCallback<T extends (...args: any[]) => any>(callback: T, deps: unknown[]): T {
+    this.validateHookContext('useCallback');
+
+    const hooks = (this.currentRenderingComponent!.hooks ||= []);
+
+    /**
+     * @case First time calling this hook for this component
+     */
+    if (hooks.length <= this.hookIndexInEachComponent) {
+      const memoizedCallback: MemoizedCallback<T> = { callback, deps };
+
+      hooks.push(memoizedCallback);
+
+      this.hookIndexInEachComponent++;
+      return callback;
+    }
+
+    /**
+     * @case Hook already exists from previous render
+     */
+    const currentMemoizedCallback = hooks[this.hookIndexInEachComponent] as MemoizedCallback<T>;
+
+    /** Previous dependency array */
+    const prevDeps = currentMemoizedCallback.deps;
+
+    /** Check if dependencies have changed */
+    const isDepsChanged = !this.areDepsEqual(prevDeps, deps);
+
+    if (isDepsChanged) {
+      // Update callback if dependencies changed
+      currentMemoizedCallback.callback = callback;
+      currentMemoizedCallback.deps = deps;
+    }
+
+    this.hookIndexInEachComponent++;
+    return currentMemoizedCallback.callback;
   }
 
   /**
