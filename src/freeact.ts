@@ -9,6 +9,7 @@ const PROP_KEY = 'key';
 const PROP_STYLE = 'style';
 const PROP_CLASS_NAME = 'className';
 const EVENT_PREFIX = 'on';
+const EVENT_PREFIX_LENGTH = 2; // Length of "on" prefix for event handlers (onClick -> click)
 
 interface IFreeact {
   createVirtualElement(type: VirtualElement, props: Record<string, unknown>): VirtualNode;
@@ -124,7 +125,21 @@ class Freeact implements IFreeact {
   }
 
   /**
-   * @description create virtual element
+   * Creates a virtual DOM element node
+   *
+   * @param type - Element type (string for HTML tags, function for components)
+   * @param props - Element properties including children, key, and attributes
+   * @param children - Child elements (null/undefined filtered, primitives converted to text nodes)
+   * @returns Virtual node representing the element
+   *
+   * @example
+   * ```tsx
+   * // HTML element
+   * freeact.createVirtualElement('div', { className: 'container' }, 'Hello')
+   *
+   * // Function component
+   * freeact.createVirtualElement(MyComponent, { name: 'Alice' })
+   * ```
    */
   public createVirtualElement(
     type: VirtualElement,
@@ -311,8 +326,21 @@ class Freeact implements IFreeact {
     // to be: c b d
 
     /**
-     * @todo - newVirtualChildren.length - 1인 가장 맨 끝 노드는 재조정이 필요없는지 재확인 필요!
-     * 현재는 newVirtualChildren.length - 2인 노드부터 계속 새로운 뒷자리 형제를 찾아 재조정을 하기 때문에 불필요하다고 판단함.
+     * @optimization Algorithm starts at length-2, not length-1
+     *
+     * The last element serves as an "anchor point" and doesn't need explicit positioning.
+     * By iterating backwards and positioning each element before its successor, the last
+     * element automatically ends up in the correct position.
+     *
+     * Proof: After processing index i, elements [i...n-1] are correctly ordered (by induction).
+     *
+     * Example: DOM [C,A,B] → Target [A,B,C]
+     *   i=1: insertBefore(B,C) → B is before C ✓
+     *   i=0: insertBefore(A,B) → A is before B ✓
+     *   Result: [A,B,C] ✓ (C was never moved!)
+     *
+     * For detailed explanation including mathematical proof and performance analysis,
+     * see: REORDERING_ALGORITHM.md
      */
     for (let i = newVirtualChildren.length - 2; i >= 0; i--) {
       /** 현재 노드 */
@@ -483,7 +511,7 @@ class Freeact implements IFreeact {
    */
   private convertToEventName(arg: string): string {
     // 대문자 이벤트명 정규화: onClick -> click
-    const eventName = arg.slice(2).toLowerCase();
+    const eventName = arg.slice(EVENT_PREFIX_LENGTH).toLowerCase();
 
     /** change 이벤트는 input 이벤트로 변환 */
     const convertedEventName = eventName === 'change' ? 'input' : eventName;
@@ -612,7 +640,20 @@ class Freeact implements IFreeact {
   }
 
   /**
-   * @description useState
+   * React-style state hook for function components
+   *
+   * @template S - State type
+   * @param defaultValue - Initial state value or lazy initializer function
+   * @returns Tuple of [currentState, setState function]
+   * @throws Error if called outside a function component
+   *
+   * @example
+   * ```tsx
+   * const [count, setCount] = freeact.useState(0)
+   * const [data, setData] = freeact.useState(() => expensiveComputation())
+   * setCount(count + 1)
+   * setCount(prev => prev + 1)
+   * ```
    */
   public useState<S>(defaultValue: S | (() => S)): [S, (value: S | ((prev: S) => S)) => void] {
     this.validateHookContext('useState');
@@ -699,7 +740,25 @@ class Freeact implements IFreeact {
   }
 
   /**
-   * @description useEffect
+   * React-style effect hook for side effects in function components
+   *
+   * @param callback - Effect function, optionally returning a cleanup function
+   * @param deps - Dependency array (effect runs when dependencies change)
+   * @throws Error if called outside a function component
+   *
+   * @example
+   * ```tsx
+   * // Run once on mount
+   * freeact.useEffect(() => {
+   *   console.log('Mounted')
+   *   return () => console.log('Unmounted')
+   * }, [])
+   *
+   * // Run when count changes
+   * freeact.useEffect(() => {
+   *   document.title = `Count: ${count}`
+   * }, [count])
+   * ```
    */
   public useEffect(callback: EffectCallback, deps: unknown[]) {
     this.validateHookContext('useEffect');
@@ -745,7 +804,16 @@ class Freeact implements IFreeact {
   }
 
   /**
-   * @description render
+   * Renders a virtual DOM tree into a container element
+   *
+   * @param virtualNode - The root virtual node to render
+   * @param container - The DOM element to render into
+   *
+   * @example
+   * ```tsx
+   * const app = freeact.createVirtualElement(App, {})
+   * freeact.render(app, document.getElementById('root')!)
+   * ```
    */
   public render(virtualNode: VirtualNode, container: Element): void {
     const prevRootNode = this.rootNodes.get(container) || null;
