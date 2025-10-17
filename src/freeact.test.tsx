@@ -1082,7 +1082,7 @@ describe('Freeact', () => {
     it('should preserve callback with empty dependency array', () => {
       const callbackFn = vi.fn((x: number) => x * 2);
       let setDummy: ((value: number) => void) | null = null;
-      const callbacks: Function[] = [];
+      const callbacks: Array<() => number> = [];
 
       const Component = () => {
         const [dummy, setD] = freeact.useState(0);
@@ -1231,7 +1231,7 @@ describe('Freeact', () => {
     });
 
     it('should handle multiple dependencies', () => {
-      let triggerCallback: ((x: number) => number) | null = null;
+      let triggerCallback: (() => number) | null = null;
       let setA: ((val: number) => void) | null = null;
       let setB: ((val: number) => void) | null = null;
 
