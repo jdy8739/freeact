@@ -58,6 +58,22 @@ class Freeact implements IFreeact {
 
   /**
    * @private
+   * @description check if virtual node is a function component
+   */
+  private isFunctionComponent(virtualNode: VirtualNode): boolean {
+    return typeof virtualNode.type === 'function';
+  }
+
+  /**
+   * @private
+   * @description check if virtual node is a text element
+   */
+  private isTextElement(virtualNode: VirtualNode): boolean {
+    return virtualNode.type === TEXT_ELEMENT;
+  }
+
+  /**
+   * @private
    * @description create text element
    */
   private createTextElement(text: string): VirtualNode {
@@ -152,7 +168,7 @@ class Freeact implements IFreeact {
    * @description create real dom element or text node
    */
   private createElement(virtualNode: VirtualNode): Text | HTMLElement {
-    if (virtualNode.type === TEXT_ELEMENT) {
+    if (this.isTextElement(virtualNode)) {
       return document.createTextNode(String(virtualNode.props.value));
     }
 
@@ -207,7 +223,7 @@ class Freeact implements IFreeact {
    * setState로 재렌더링되는 컴포넌트는 무조건 함수 컴포넌트이므로 함수취급합니다.
    */
   private renderSubtree(virtualNode: VirtualNode) {
-    if (typeof virtualNode.type !== 'function') {
+    if (!this.isFunctionComponent(virtualNode)) {
       return;
     }
 
@@ -363,7 +379,7 @@ class Freeact implements IFreeact {
      * @case 2: Add real node in real dom tree when oldVirtualNode is null.
      */
     if (!oldVirtualNode && newVirtualNode) {
-      if (typeof newVirtualNode.type === 'function') {
+      if (this.isFunctionComponent(newVirtualNode)) {
         this.renderFunctionComponent(parentNode, null, newVirtualNode);
         return;
       }
@@ -386,7 +402,7 @@ class Freeact implements IFreeact {
       // Clean up old node tree before replacing
       this.cleanupVirtualNodeTree(oldVirtualNode!);
 
-      if (typeof newVirtualNode!.type === 'function') {
+      if (this.isFunctionComponent(newVirtualNode!)) {
         parentNode.removeChild(oldVirtualNode!.realNode!);
         this.renderFunctionComponent(parentNode, null, newVirtualNode);
         return;
@@ -408,7 +424,7 @@ class Freeact implements IFreeact {
     /**
      * @case 4: the case that old and new virtual nodes are same type and type is function.
      */
-    if (typeof newVirtualNode!.type === 'function') {
+    if (this.isFunctionComponent(newVirtualNode!)) {
       this.renderFunctionComponent(parentNode, oldVirtualNode, newVirtualNode);
       return;
     }
@@ -418,7 +434,7 @@ class Freeact implements IFreeact {
      */
     const realNode: Node = (newVirtualNode!.realNode = oldVirtualNode!.realNode)!;
 
-    if (newVirtualNode!.type === TEXT_ELEMENT) {
+    if (this.isTextElement(newVirtualNode!)) {
       realNode.textContent = String(newVirtualNode!.props.value);
     } else {
       this.reconcileChildren(realNode, parentVirtualNode, oldVirtualNode!, newVirtualNode!);
