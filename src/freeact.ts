@@ -44,6 +44,13 @@ class Freeact implements IFreeact {
 
   /**
    * @private
+   * @member root nodes
+   * 각 컨테이너의 루트 가상 노드를 추적하여 재렌더링 시 이전 상태와 비교할 수 있도록 함
+   */
+  private rootNodes = new WeakMap<Element, VirtualNode>();
+
+  /**
+   * @private
    * @description create text element
    */
   private createTextElement(text: string): VirtualNode {
@@ -57,6 +64,35 @@ class Freeact implements IFreeact {
   }
 
   /**
+   * @private
+   * @description recursively cleanup effects in virtual node tree
+   */
+  private cleanupVirtualNodeTree(virtualNode: VirtualNode): void {
+    // Clean up hooks on this node
+    if (virtualNode.hooks) {
+      for (const hook of virtualNode.hooks) {
+        if (Boolean(hook) && typeof hook === 'object') {
+          (hook as Effect).cleanup?.();
+        }
+      }
+    }
+
+    // Recursively clean up child if it's a function component
+    if (virtualNode.child) {
+      this.cleanupVirtualNodeTree(virtualNode.child);
+    }
+
+    // Recursively clean up children
+    if (virtualNode.props?.children) {
+      for (const child of virtualNode.props.children) {
+        if (child && typeof child === 'object') {
+          this.cleanupVirtualNodeTree(child);
+        }
+      }
+    }
+  }
+
+  /**
    * @description create virtual element
    */
   public createVirtualElement(
@@ -64,13 +100,15 @@ class Freeact implements IFreeact {
     props: ({ key?: Key } & Record<string, unknown>) | null = {},
     ...children: unknown[]
   ): VirtualNode {
-    const childrenElements = children.filter(Boolean).map((child) => {
-      if (typeof child === 'object') {
-        return child as VirtualNode;
-      }
+    const childrenElements = children
+      .filter((child) => child !== null && child !== undefined)
+      .map((child) => {
+        if (typeof child === 'object') {
+          return child as VirtualNode;
+        }
 
-      return this.createTextElement(String(child));
-    });
+        return this.createTextElement(String(child));
+      });
 
     return {
       type,
@@ -322,14 +360,8 @@ class Freeact implements IFreeact {
     if (oldVirtualNode && !newVirtualNode) {
       parentNode.removeChild(oldVirtualNode.realNode!);
 
-      // remove effects before unmounting
-      if (oldVirtualNode.hooks) {
-        for (const hook of oldVirtualNode.hooks) {
-          if (Boolean(hook) && typeof hook === 'object') {
-            (hook as Effect).cleanup?.();
-          }
-        }
-      }
+      // Recursively remove effects before unmounting
+      this.cleanupVirtualNodeTree(oldVirtualNode);
       return;
     }
 
@@ -357,6 +389,9 @@ class Freeact implements IFreeact {
      * @case 3: Replace real node in real dom tree when type is different.
      */
     if (oldVirtualNode!.type !== newVirtualNode!.type) {
+      // Clean up old node tree before replacing
+      this.cleanupVirtualNodeTree(oldVirtualNode!);
+
       if (typeof newVirtualNode!.type === 'function') {
         parentNode.removeChild(oldVirtualNode!.realNode!);
         this.renderFunctionComponent(parentNode, null, newVirtualNode);
@@ -532,7 +567,7 @@ class Freeact implements IFreeact {
   /**
    * @description useState
    */
-  public useState<S>(defaultValue: S): [S, (value: S | ((prev: S) => S)) => void] {
+  public useState<S>(defaultValue: S | (() => S)): [S, (value: S | ((prev: S) => S)) => void] {
     if (!this.currentRenderingComponent) {
       throw new Error('useState can only be called inside a function component.');
     }
@@ -540,7 +575,9 @@ class Freeact implements IFreeact {
     const hooks = (this.currentRenderingComponent.hooks ||= []);
 
     if (hooks.length <= this.hookIndexInEachComponent) {
-      hooks.push(defaultValue);
+      // Lazy initialization: if defaultValue is a function, call it to get the initial value
+      const initialValue = typeof defaultValue === 'function' ? (defaultValue as () => S)() : defaultValue;
+      hooks.push(initialValue);
     }
 
     /** 현재 이 컴포넌트의 hooks에서 지금 인덱스에 저장된 상태 */
@@ -662,7 +699,12 @@ class Freeact implements IFreeact {
    * @description render
    */
   public render(virtualNode: VirtualNode, container: Element): void {
-    this.reconcile(container, null, null, virtualNode);
+    const prevRootNode = this.rootNodes.get(container) || null;
+
+    this.reconcile(container, null, prevRootNode, virtualNode);
+
+    // Store the new root node for future renders
+    this.rootNodes.set(container, virtualNode);
 
     // 렌더링 완료 후 이펙트 큐에 들어있던 이펙트 실행
     this.flushEffects();
