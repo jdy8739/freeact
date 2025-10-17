@@ -154,19 +154,15 @@ class Freeact implements IFreeact {
 
   /**
    * @private
-   * @description render function component
+   * @description Execute function component and reconcile its output
    */
-  private renderFunctionComponent(
-    parentNode: Node,
-    oldVirtualNode: VirtualNode | null,
-    newVirtualNode: VirtualNode | null,
-  ): void {
+  private executeFunctionComponent(componentNode: VirtualNode, parentNode: Node, oldChild: VirtualNode | null): void {
     /** Context setting for rendering component. */
-    this.currentRenderingComponent = newVirtualNode;
+    this.currentRenderingComponent = componentNode;
     this.hookIndexInEachComponent = 0;
 
     /** 함수컴포넌트의 반환값 */
-    let childOfFunctionComponent = (newVirtualNode?.type as Function)(newVirtualNode?.props);
+    let childOfFunctionComponent = (componentNode.type as Function)(componentNode.props);
 
     if (!childOfFunctionComponent) {
       childOfFunctionComponent = this.createTextElement('');
@@ -175,15 +171,27 @@ class Freeact implements IFreeact {
     }
 
     childOfFunctionComponent.parentNode = parentNode;
-    childOfFunctionComponent.parentVirtualNode = newVirtualNode;
+    childOfFunctionComponent.parentVirtualNode = componentNode;
 
-    this.reconcile(parentNode, newVirtualNode, oldVirtualNode?.child || null, childOfFunctionComponent);
+    this.reconcile(parentNode, componentNode, oldChild, childOfFunctionComponent);
 
-    newVirtualNode!.child = childOfFunctionComponent;
-    newVirtualNode!.realNode = childOfFunctionComponent.realNode;
+    componentNode.child = childOfFunctionComponent;
+    componentNode.realNode = childOfFunctionComponent.realNode;
 
     /** Delete context for rendering component. */
     this.currentRenderingComponent = null;
+  }
+
+  /**
+   * @private
+   * @description render function component
+   */
+  private renderFunctionComponent(
+    parentNode: Node,
+    oldVirtualNode: VirtualNode | null,
+    newVirtualNode: VirtualNode | null,
+  ): void {
+    this.executeFunctionComponent(newVirtualNode!, parentNode, oldVirtualNode?.child || null);
   }
 
   /**
@@ -196,28 +204,7 @@ class Freeact implements IFreeact {
       return;
     }
 
-    this.currentRenderingComponent = virtualNode;
-    this.hookIndexInEachComponent = 0;
-
-    /** 함수컴포넌트의 반환값 */
-    let childOfFunctionComponent = (virtualNode?.type as Function)(virtualNode?.props);
-
-    if (!childOfFunctionComponent) {
-      childOfFunctionComponent = this.createTextElement('');
-    } else if (typeof childOfFunctionComponent !== 'object') {
-      childOfFunctionComponent = this.createTextElement(String(childOfFunctionComponent));
-    }
-
-    const parentNode = virtualNode.parentRealNode;
-    childOfFunctionComponent.parentNode = parentNode;
-    childOfFunctionComponent.parentVirtualNode = virtualNode;
-
-    this.reconcile(parentNode!, virtualNode, virtualNode.child ?? null, childOfFunctionComponent);
-
-    virtualNode.child = childOfFunctionComponent;
-    virtualNode.realNode = childOfFunctionComponent.realNode;
-
-    this.currentRenderingComponent = null;
+    this.executeFunctionComponent(virtualNode, virtualNode.parentRealNode!, virtualNode.child ?? null);
 
     // 렌더링 완료 후 이펙트 큐에 들어있던 이펙트 실행
     this.flushEffects();
