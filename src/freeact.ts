@@ -3,6 +3,13 @@ import { VirtualNode, VirtualElement, Key, Effect, EffectCallback } from './inde
 
 const TEXT_ELEMENT = 'TEXT_ELEMENT';
 
+// Reserved prop names
+const PROP_CHILDREN = 'children';
+const PROP_KEY = 'key';
+const PROP_STYLE = 'style';
+const PROP_CLASS_NAME = 'className';
+const EVENT_PREFIX = 'on';
+
 interface IFreeact {
   createVirtualElement(type: VirtualElement, props: Record<string, unknown>): VirtualNode;
   render(element: VirtualNode, container: Element): void;
@@ -58,7 +65,7 @@ class Freeact implements IFreeact {
       type: TEXT_ELEMENT,
       props: {
         value: text,
-        children: [],
+        [PROP_CHILDREN]: [],
       },
     };
   }
@@ -114,8 +121,8 @@ class Freeact implements IFreeact {
       type,
       props: {
         ...props,
-        key: props?.key ?? null,
-        children: childrenElements,
+        [PROP_KEY]: props?.key ?? null,
+        [PROP_CHILDREN]: childrenElements,
       },
     };
   }
@@ -130,7 +137,7 @@ class Freeact implements IFreeact {
     virtualNode.realNode = realNode;
 
     for (const key in virtualNode.props) {
-      if (key === 'children' || key === 'key') {
+      if (key === PROP_CHILDREN || key === PROP_KEY) {
         continue;
       }
 
@@ -234,7 +241,7 @@ class Freeact implements IFreeact {
     for (let i = 0; i < oldVirtualChildren.length; i++) {
       const oldChild = oldVirtualChildren[i];
 
-      oldChildrenMap.set(oldChild.props.key ?? i, oldChild);
+      oldChildrenMap.set(oldChild.props[PROP_KEY] ?? i, oldChild);
     }
 
     /**
@@ -243,7 +250,7 @@ class Freeact implements IFreeact {
     for (let i = 0; i < newVirtualChildren.length; i++) {
       const newChild = newVirtualChildren[i];
 
-      const newChildKey = newChild.props.key ?? i;
+      const newChildKey = newChild.props[PROP_KEY] ?? i;
 
       const oldChild = oldChildrenMap.get(newChildKey) ?? null;
 
@@ -487,23 +494,23 @@ class Freeact implements IFreeact {
      * 1단계: nextProps에 사라졌거나 값이 달라진 이전 속성·리스너 제거
      * ----------------------------------------------------------------*/
     Object.keys(prevProps).forEach((key) => {
-      if (key === 'children' || key === 'key') return; // 가상 DOM 전용 필드
+      if (key === PROP_CHILDREN || key === PROP_KEY) return; // 가상 DOM 전용 필드
 
       const prevProp = prevProps[key];
       const nextProp = nextProps[key];
 
       if (!(key in nextProps) || prevProp !== nextProp) {
-        if (key.startsWith('on') && typeof prevProp === 'function') {
+        if (key.startsWith(EVENT_PREFIX) && typeof prevProp === 'function') {
           /* 이전 렌더링 시점에 달려있었던 이벤트 */
           const eventName = this.convertToEventName(key);
 
           el.removeEventListener(eventName, prevProp as EventListener);
 
           Reflect.deleteProperty(currentListeners, eventName);
-        } else if (key === 'style') {
+        } else if (key === PROP_STYLE) {
           /* style: 전체 초기화(개별 diff는 2단계에서 처리) */
           el.style.cssText = '';
-        } else if (key === 'className') {
+        } else if (key === PROP_CLASS_NAME) {
           el.removeAttribute('class');
         } else {
           el.removeAttribute(key);
@@ -515,15 +522,15 @@ class Freeact implements IFreeact {
      * 2단계: 새로 추가되었거나 값이 바뀐 속성·리스너 적용
      * ----------------------------------------------------------------*/
     Object.keys(nextProps).forEach((key) => {
-      if (key === 'children' || key === 'key') return;
+      if (key === PROP_CHILDREN || key === PROP_KEY) return;
 
       const prevProp = prevProps[key] as unknown as Record<string, unknown>;
       const nextProp = nextProps[key] as unknown as Record<string, unknown>;
 
       // style 객체는 깊이 비교가 필요하므로 제외
-      if (prevProp === nextProp && (typeof nextProp !== 'object' || nextProp === null) && key !== 'style') return;
+      if (prevProp === nextProp && (typeof nextProp !== 'object' || nextProp === null) && key !== PROP_STYLE) return;
 
-      if (key.startsWith('on')) {
+      if (key.startsWith(EVENT_PREFIX)) {
         /* 이벤트: 이전 리스너가 있으면 교체 */
         const eventName = this.convertToEventName(key);
 
@@ -535,9 +542,9 @@ class Freeact implements IFreeact {
           el.addEventListener(eventName, nextProp);
           currentListeners[eventName] = nextProp;
         }
-      } else if (key === 'style') {
+      } else if (key === PROP_STYLE) {
         this.applyStyle(el, prevProp ?? {}, nextProp ?? ({} as Record<string, unknown>));
-      } else if (key === 'className') {
+      } else if (key === PROP_CLASS_NAME) {
         // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         nextProp ? el.setAttribute('class', String(nextProp)) : el.removeAttribute('class');
       } else {
